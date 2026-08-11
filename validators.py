@@ -1,33 +1,27 @@
-def validate_email(email):
-    import re
-    if not isinstance(email, str):
-        raise ValueError('Email must be a string')
-    if not re.match(r'^[\w\.-]+@[\w\.-]+\.\w+$', email):
-        raise ValueError('Invalid email format')
-    return True
+import re
 
-def validate_age(age):
-    if not isinstance(age, int):
-        raise ValueError('Age must be an integer')
-    if age < 0:
-        raise ValueError('Age cannot be negative')
-    return True
+def is_valid_email(email: str) -> bool:
+    """Check if the email address is valid."""
+    email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return re.match(email_regex, email) is not None
 
-def validate_username(username):
-    if not isinstance(username, str):
-        raise ValueError('Username must be a string')
-    if not (3 <= len(username) <= 30):
-        raise ValueError('Username must be between 3 and 30 characters long')
-    if not username.isalnum():
-        raise ValueError('Username must only contain letters and numbers')
-    return True
 
-# Example usage (to be used during testing):
-if __name__ == '__main__':
-    try:
-        validate_email('test@example.com')
-        validate_age(25)
-        validate_username('user123')
-        print('All validations passed')
-    except ValueError as e:
-        print(e)
+def is_positive_integer(value: int) -> bool:
+    """Check if the value is a positive integer."""
+    return isinstance(value, int) and value > 0
+
+
+def is_non_empty_string(value: str) -> bool:
+    """Check if the string is non-empty."""
+    return isinstance(value, str) and len(value) > 0
+
+
+def is_valid_url(url: str) -> bool:
+    """Check if the URL is valid."""
+    url_regex = r'^(https?://)?(www\.)?([a-zA-Z0-9-]+\.[a-zA-Z]{2,}|localhost)(:[0-9]{1,5})?(/.*)?$'
+    return re.match(url_regex, url) is not None
+
+
+def is_in_range(value: int, min_value: int, max_value: int) -> bool:
+    """Check if the value is within a specified range."""
+    return isinstance(value, int) and min_value <= value <= max_value
