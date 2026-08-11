@@ -1,20 +1,30 @@
+import json
 import os
 
-class Config:
-    """Configuration settings for the application."""
-    def __init__(self):
-        self.environment = os.getenv('ENVIRONMENT', 'development')
-        self.debug = self.environment == 'development'
-        self.database_uri = os.getenv('DATABASE_URI')
-        self.log_level = os.getenv('LOG_LEVEL', 'INFO')
-        self.port = int(os.getenv('PORT', 5000))
+class ConfigLoader:
+    def __init__(self, default_config_path):
+        self.default_config_path = default_config_path
+        self.config = self.load_defaults()  
 
-    def display_config(self):
-        """Display the current configuration settings."""
-        return {
-            'environment': self.environment,
-            'debug': self.debug,
-            'database_uri': self.database_uri,
-            'log_level': self.log_level,
-            'port': self.port
-        }
+    def load_defaults(self):
+        # Load default config from a JSON file
+        if not os.path.exists(self.default_config_path):
+            raise FileNotFoundError(f"Default config not found at {self.default_config_path}")
+        with open(self.default_config_path, 'r') as file:
+            return json.load(file)
+
+    def merge_with_environment(self):
+        # Update config with environment variables if they exist
+        for key in self.config:
+            env_value = os.getenv(key)
+            if env_value is not None:
+                self.config[key] = env_value
+
+    def get_config(self):
+        # Return the final configuration
+        self.merge_with_environment()
+        return self.config
+
+# Example usage:
+# config_loader = ConfigLoader('default_config.json')
+# config = config_loader.get_config()
