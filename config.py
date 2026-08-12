@@ -1,30 +1,25 @@
-import json
 import os
+import logging
+from logging.handlers import RotatingFileHandler
 
-class ConfigLoader:
-    def __init__(self, default_config_path):
-        self.default_config_path = default_config_path
-        self.config = self.load_defaults()  
+# Configure the logger
+LOGGING_LEVEL = logging.INFO
+LOGGING_FORMAT = '%(asctime)s - %(levelname)s - %(message)s'
+LOG_FILE = 'crypto_tool.log'
+MAX_BYTES = 5 * 1024 * 1024  # 5 MB
+BACKUP_COUNT = 3
 
-    def load_defaults(self):
-        # Load default config from a JSON file
-        if not os.path.exists(self.default_config_path):
-            raise FileNotFoundError(f"Default config not found at {self.default_config_path}")
-        with open(self.default_config_path, 'r') as file:
-            return json.load(file)
 
-    def merge_with_environment(self):
-        # Update config with environment variables if they exist
-        for key in self.config:
-            env_value = os.getenv(key)
-            if env_value is not None:
-                self.config[key] = env_value
-
-    def get_config(self):
-        # Return the final configuration
-        self.merge_with_environment()
-        return self.config
+def setup_logger():
+    logger = logging.getLogger('CryptoAutomationTool')
+    logger.setLevel(LOGGING_LEVEL)
+    handler = RotatingFileHandler(LOG_FILE, maxBytes=MAX_BYTES, backupCount=BACKUP_COUNT)
+    formatter = logging.Formatter(LOGGING_FORMAT)
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    return logger
 
 # Example usage:
-# config_loader = ConfigLoader('default_config.json')
-# config = config_loader.get_config()
+if __name__ == '__main__':
+    log = setup_logger()
+    log.info('Logger is set up and ready.')
