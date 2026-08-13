@@ -1,25 +1,31 @@
+import json
 import os
-import logging
-from logging.handlers import RotatingFileHandler
 
-# Configure the logger
-LOGGING_LEVEL = logging.INFO
-LOGGING_FORMAT = '%(asctime)s - %(levelname)s - %(message)s'
-LOG_FILE = 'crypto_tool.log'
-MAX_BYTES = 5 * 1024 * 1024  # 5 MB
-BACKUP_COUNT = 3
+DEFAULT_CONFIG = {
+    'api_key': 'default_api_key',
+    'api_secret': 'default_api_secret',
+    'base_url': 'https://api.default.com',
+    'timeout': 30
+}
 
+class ConfigLoader:
+    def __init__(self, config_file='config.json'):
+        self.config_file = config_file
+        self.config = DEFAULT_CONFIG.copy()  # Start with default config
+        self.load_config()  # Load config from file if it exists
 
-def setup_logger():
-    logger = logging.getLogger('CryptoAutomationTool')
-    logger.setLevel(LOGGING_LEVEL)
-    handler = RotatingFileHandler(LOG_FILE, maxBytes=MAX_BYTES, backupCount=BACKUP_COUNT)
-    formatter = logging.Formatter(LOGGING_FORMAT)
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-    return logger
+    def load_config(self):
+        if os.path.exists(self.config_file):
+            with open(self.config_file, 'r') as file:
+                file_config = json.load(file)
+                self.config.update(file_config)  # Update with values from file
 
-# Example usage:
+    def get(self, key, default=None):
+        return self.config.get(key, default)
+
+    def __str__(self):
+        return json.dumps(self.config, indent=4)
+
 if __name__ == '__main__':
-    log = setup_logger()
-    log.info('Logger is set up and ready.')
+    loader = ConfigLoader()
+    print(loader)  # Print the loaded configuration
