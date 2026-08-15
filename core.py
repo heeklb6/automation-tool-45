@@ -1,30 +1,34 @@
-import requests
+import time
+import functools
 
-class CryptoAPI:
-    BASE_URL = 'https://api.coingecko.com/api/v3/'
+class RateLimiter:
+    """Decorator to limit the rate of function calls."""
+    def __init__(self, max_calls, period):
+        self.max_calls = max_calls
+        self.period = period
+        self.calls = 0
+        self.start_time = time.time()
 
-    def get_price(self, coin_id):
-        url = f'{self.BASE_URL}simple/price?ids={coin_id}&vs_currencies=usd'
-        response = requests.get(url)
-        if response.status_code == 200:
-            return response.json()
-        else:
-            raise Exception('API request failed')
+    def __call__(self, func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            if self.calls >= self.max_calls:
+                elapsed = time.time() - self.start_time
+                if elapsed < self.period:
+                    time.sleep(self.period - elapsed)
+                self.calls = 0
+                self.start_time = time.time()
+            self.calls += 1
+            return func(*args, **kwargs)
+        return wrapper
 
-    def get_market_data(self, coin_id):
-        url = f'{self.BASE_URL}coins/{coin_id}'
-        response = requests.get(url)
-        if response.status_code == 200:
-            return response.json()
-        else:
-            raise Exception('API request failed')
+@RateLimiter(max_calls=5, period=10)
+def fetch_data(api_endpoint):
+    # Simulate an API call
+    print(f'Fetching data from {api_endpoint}')
+    return {'data': 'sample data'}
 
 if __name__ == '__main__':
-    crypto_api = CryptoAPI()
-    try:
-        price = crypto_api.get_price('bitcoin')
-        market_data = crypto_api.get_market_data('bitcoin')
-        print('Bitcoin Price:', price)
-        print('Market Data:', market_data)
-    except Exception as e:
-        print('Error:', e)
+    for _ in range(20):
+        fetch_data('https://api.example.com/data')
+        time.sleep(1)
