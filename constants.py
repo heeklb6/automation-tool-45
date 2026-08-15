@@ -1,25 +1,19 @@
-API_KEY = "your_api_key_here"
-API_SECRET = "your_api_secret_here"
-
-BASE_URL = "https://api.cryptoexchange.com"
-
-# Timeout settings
-REQUEST_TIMEOUT = 10  # in seconds
-
-# Define possible order types
-ORDER_TYPES = ["buy", "sell", "limit", "market"]
-
-# Define supported currencies
-SUPPORTED_CURRENCIES = ["BTC", "ETH", "LTC", "XRP"]
-
-# Fee structures
-TRANSACTION_FEE_PERCENT = 0.1
-WITHDRAWAL_FEE = {"BTC": 0.0005, "ETH": 0.01, "LTC": 0.001, "XRP": 0.01}
-
-# Logging constants
-LOG_LEVEL = "INFO"
-MAX_LOG_SIZE = 10485760  # 10 MB
-MAX_LOG_FILES = 5
-
-# Environment settings
-ENVIRONMENT = "production"  # Change to 'development' for testing
+API_BASE_URL = 'https://api.crypto.com'
+DEFAULT_TIMEOUT = 30
+SUPPORTED_CURRENCIES = ['BTC', 'ETH', 'LTC', 'XRP']
+ERROR_MESSAGES = {
+    'network_error': 'Network error, please try again.',
+    'invalid_currency': 'The specified currency is not supported.',
+    'rate_limit': 'Rate limit exceeded, please wait before retrying.'
+}
+CURRENCY_SYMBOLS = {
+    'BTC': '₿',
+    'ETH': 'Ξ',
+    'LTC': 'Ł',
+    'XRP': 'X'
+}
+MARKET_STATUS = {
+    'bull': 'Bull market',
+    'bear': 'Bear market',
+    'sideways': 'Sideways market'
+}
