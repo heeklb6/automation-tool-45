@@ -1,29 +1,47 @@
-import time
-import random
-import requests
-from requests.exceptions import RequestException
+from typing import List, Dict, Any
+import json
 
-def retry_request(url, max_retries=5, backoff_factor=1):
-    """Attempt to perform a network request with retry logic.
-    
+def read_json(file_path: str) -> Dict[str, Any]:
+    """Read a JSON file and return its content as a dictionary.
+
     Args:
-        url (str): The URL to request.
-        max_retries (int): The maximum number of retry attempts.
-        backoff_factor (int): The multiplier for backoff time.
-    
+        file_path (str): The path to the JSON file.
+
     Returns:
-        Response object if the request was successful; raises exception otherwise.
+        Dict[str, Any]: The content of the JSON file as a dictionary.
     """
-    attempts = 0
-    while attempts < max_retries:
-        try:
-            response = requests.get(url)
-            response.raise_for_status()  # Raise an error for bad responses
-            return response
-        except RequestException as e:
-            attempts += 1
-            if attempts == max_retries:
-                raise RuntimeError(f'Failed to fetch {url} after {attempts} attempts')
-            wait_time = backoff_factor * (2 ** (attempts - 1)) + random.uniform(0, 1)
-            time.sleep(wait_time)
-            print(f'Retrying {url} (Attempt {attempts}/{max_retries})...')
+    with open(file_path, 'r') as file:
+        return json.load(file)
+
+
+def write_json(file_path: str, data: Dict[str, Any]) -> None:
+    """Write a dictionary to a JSON file.
+
+    Args:
+        file_path (str): The path to the JSON file.
+        data (Dict[str, Any]): The data to write to the file.
+    """
+    with open(file_path, 'w') as file:
+        json.dump(data, file, indent=4)
+
+
+def find_value_in_dict(data: Dict[str, Any], key: str) -> List[Any]:
+    """Find all values for a given key in a nested dictionary.
+
+    Args:
+        data (Dict[str, Any]): The nested dictionary to search.
+        key (str): The key to find.
+
+    Returns:
+        List[Any]: A list of values associated with the key.
+    """
+    values = []
+    if isinstance(data, dict):
+        for k, v in data.items():
+            if k == key:
+                values.append(v)
+            values.extend(find_value_in_dict(v, key))
+    elif isinstance(data, list):
+        for item in data:
+            values.extend(find_value_in_dict(item, key))
+    return values
