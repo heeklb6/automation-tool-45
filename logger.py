@@ -1,32 +1,43 @@
 import logging
 
-# Configure the logger
-logging.basicConfig(level=logging.INFO,
-                    format='%(asctime)s - %(levelname)s - %(message)s')
+class Logger:
+    def __init__(self, log_file='app.log'):
+        # Set up the logger
+        self.logger = logging.getLogger('CryptoLogger')
+        self.logger.setLevel(logging.DEBUG)
 
-# Create a logger
-logger = logging.getLogger(__name__)
+        # Create file handler
+        fh = logging.FileHandler(log_file)
+        fh.setLevel(logging.DEBUG)
 
-def log_info(message):
-    """Log an info message"""
-    logger.info(message)
+        # Create console handler
+        ch = logging.StreamHandler()
+        ch.setLevel(logging.ERROR)
 
+        # Create a formatter
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        fh.setFormatter(formatter)
+        ch.setFormatter(formatter)
 
-def log_warning(message):
-    """Log a warning message"""
-    logger.warning(message)
+        # Add handlers to the logger
+        self.logger.addHandler(fh)
+        self.logger.addHandler(ch)
 
+    def debug(self, msg):
+        self.logger.debug(msg)
 
-def log_error(message):
-    """Log an error message"""
-    logger.error(message)
+    def info(self, msg):
+        self.logger.info(msg)
 
+    def warning(self, msg):
+        self.logger.warning(msg)
 
-def log_critical(message):
-    """Log a critical message"""
-    logger.critical(message)
+    def error(self, msg):
+        self.logger.error(msg)
 
+    def critical(self, msg):
+        self.logger.critical(msg)
 
-def log_exception(exception):
-    """Log an exception message"""
-    logger.exception('An exception occurred: %s', exception)
+# Example usage:
+# logger = Logger()
+# logger.info('This is an info message')
