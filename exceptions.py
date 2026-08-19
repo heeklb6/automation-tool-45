@@ -1,38 +1,20 @@
 class CryptoError(Exception):
-    """Base class for exceptions in this module."""
+    """Base class for all custom exceptions in the crypto module."""
     pass
 
-class InsufficientFundsError(CryptoError):
-    """Exception raised for insufficient funds."""
-    def __init__(self, amount, balance):
-        self.amount = amount
-        self.balance = balance
-        super().__init__(f'Insufficient funds: Tried to withdraw {amount}, but balance is {balance}.')
-
-class TransactionError(CryptoError):
-    """Exception raised for transaction failures."""
-    def __init__(self, transaction_id, reason):
-        self.transaction_id = transaction_id
-        self.reason = reason
-        super().__init__(f'Transaction {transaction_id} failed: {reason}.')
-
 class NetworkError(CryptoError):
-    """Exception raised for network-related issues."""
+    """Exception raised for network-related errors."""
     def __init__(self, message):
-        super().__init__(f'Network error: {message}.')
+        super().__init__(message)
 
-# Example functions demonstrating error handling
+class ValidationError(CryptoError):
+    """Exception raised for validation errors of input data."""
+    def __init__(self, field, message):
+        self.field = field
+        self.message = message
+        super().__init__(f'Validation error in {field}: {message}')
 
-def withdraw(amount, balance):
-    if amount > balance:
-        raise InsufficientFundsError(amount, balance)
-    return balance - amount
-
-
-def process_transaction(transaction_id):
-    # Simulating a transaction failure
-    raise TransactionError(transaction_id, 'Insufficient liquidity')
-
-# Simulate network function
-def fetch_data():
-    raise NetworkError('Could not connect to server')
+class ConfigurationError(CryptoError):
+    """Exception raised for configuration-related errors."""
+    def __init__(self, message):
+        super().__init__(message)
