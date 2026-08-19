@@ -1,33 +1,43 @@
-import re
-
-# Regular expression for validating cryptocurrency addresses
-BTC_ADDRESS_REGEX = r'^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$'
-ETH_ADDRESS_REGEX = r'^0x[a-fA-F0-9]{40}$'
-
-def is_valid_btc_address(address: str) -> bool:
-    """
-    Validate if the provided Bitcoin address is valid.
-    Bitcoin addresses can start with '1' or '3' and must be 26-35 characters long.
-    """
-    return bool(re.match(BTC_ADDRESS_REGEX, address))
+from typing import Any, Dict
 
 
-def is_valid_eth_address(address: str) -> bool:
+def validate_address(address: str) -> bool:
     """
-    Validate if the provided Ethereum address is valid.
-    Ethereum addresses must start with '0x' followed by 40 hexadecimal characters.
+    Validate if the given address is a valid cryptocurrency address.
+
+    Args:
+        address (str): The cryptocurrency address to validate.
+
+    Returns:
+        bool: True if the address is valid, False otherwise.
     """
-    return bool(re.match(ETH_ADDRESS_REGEX, address))
+    # Basic validation rules for an address
+    if len(address) < 26 or len(address) > 42:
+        return False
+    if not all(c in "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz" for c in address):
+        return False
+    return True
 
 
-def validate_crypto_address(address: str, crypto_type: str) -> bool:
+def validate_transaction(transaction: Dict[str, Any]) -> bool:
     """
-    Validate a cryptocurrency address based on the specified type.
-    Type can be 'btc' for Bitcoin or 'eth' for Ethereum.
+    Validate if the given transaction data is valid.
+
+    Args:
+        transaction (Dict[str, Any]): The transaction data to validate.
+
+    Returns:
+        bool: True if the transaction is valid, False otherwise.
     """
-    if crypto_type == 'btc':
-        return is_valid_btc_address(address)
-    elif crypto_type == 'eth':
-        return is_valid_eth_address(address)
-    else:
-        raise ValueError("Unsupported cryptocurrency type. Use 'btc' or 'eth'.")
+    required_keys = {'from', 'to', 'amount', 'fee', 'nonce'}
+    if not required_keys.issubset(transaction.keys()):
+        return False
+    if not isinstance(transaction['amount'], (int, float)):
+        return False
+    return True
+
+
+if __name__ == "__main__":
+    # Example usage
+    print(validate_address("1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"))  # True
+    print(validate_transaction({"from": "addr1", "to": "addr2", "amount": 0.01, "fee": 0.001, "nonce": 1}))  # True
