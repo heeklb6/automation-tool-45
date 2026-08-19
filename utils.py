@@ -1,43 +1,27 @@
-from typing import Any, Dict, List
+import json
+import requests
+from datetime import datetime
 
-def calculate_average(prices: List[float]) -> float:
-    """
-    Calculate the average of a list of prices.
+class CryptoDataError(Exception):
+    pass
 
-    Args:
-        prices (List[float]): A list of price values.
+def fetch_crypto_price(symbol: str) -> dict:
+    try:
+        url = f'https://api.coindesk.com/v1/bpi/currentprice/{symbol}.json'
+        response = requests.get(url)
+        response.raise_for_status()  # Raise an exception for HTTP errors
+        data = response.json()
+        return {
+            'symbol': symbol,
+            'price': data['bpi'][symbol]['rate_float'],
+            'currency': data['bpi'][symbol]['code'],
+            'time': datetime.utcfromtimestamp(data['time']['updatedISO']).isoformat(),
+        }
+    except requests.exceptions.RequestException as e:
+        raise CryptoDataError(f'Failed to fetch price data: {e}') from e
+    except (KeyError, TypeError) as e:
+        raise CryptoDataError('Error parsing crypto price data') from e
 
-    Returns:
-        float: The average price.
-    """
-    if not prices:
-        return 0.0
-    return sum(prices) / len(prices)
-
-
-def filter_prices(prices: List[float], threshold: float) -> List[float]:
-    """
-    Filter prices that are above a given threshold.
-
-    Args:
-        prices (List[float]): A list of price values.
-        threshold (float): The threshold to filter prices.
-
-    Returns:
-        List[float]: A list of prices above the threshold.
-    """
-    return [price for price in prices if price > threshold]
-
-
-def convert_to_dict(items: List[str], values: List[Any]) -> Dict[str, Any]:
-    """
-    Convert two lists into a dictionary.
-
-    Args:
-        items (List[str]): A list of keys.
-        values (List[Any]): A list of values corresponding to the keys.
-
-    Returns:
-        Dict[str, Any]: A dictionary mapping keys to values.
-    """
-    return dict(zip(items, values))
+# Example usage (commented out)
+# price_info = fetch_crypto_price('USD')
+# print(price_info)  
