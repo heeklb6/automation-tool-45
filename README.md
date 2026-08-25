@@ -1,46 +1,36 @@
-# Automation Tool 45
+# automation-tool-45
 
-Automation Tool 45 is a powerful Python-based script designed to streamline cryptocurrency trading operations through automated strategies. Built with advanced algorithms, it enables traders to execute trades based on predefined market signals, reducing the need for constant manual oversight.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+automation-tool-45 is a Python package that automates cryptocurrency trading workflows on EVM-compatible blockchains. It provides reliable execution of scheduled operations while handling network conditions and error recovery.
 
 ## Features
-- **Automated Trading Strategies**: Implement custom trading algorithms that can autonomously buy and sell cryptocurrencies based on market trends.
-- **Market Signal Alerts**: Real-time notifications on significant market changes to help you make informed trading decisions.
-- **Backtesting Capabilities**: Test trading strategies on historical data to gauge their effectiveness before deploying them in live markets.
-- **Multi-exchange Support**: Connect with various cryptocurrency exchanges, allowing for diversified trading opportunities and easy portfolio management.
+- Perform automated swaps on Uniswap with dynamic gas price adjustments to avoid overpaying
+- Schedule dollar-cost averaging purchases with support for multiple token pairs
+- Monitor portfolio allocations and execute rebalances when deviations exceed custom limits
+- Bundle transactions to minimize gas fees across multiple operations
 
 ## Installation
 
-To get started with Automation Tool 45, follow these steps to install the necessary dependencies and set up your environment:
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/Developer/automation-tool-45.git
-   cd automation-tool-45
-   ```
-
-2. Create a virtual environment (optional but recommended):
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate  # On Windows use `venv\Scripts\activate`
-   ```
-
-3. Install the required packages:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-## Basic Usage Example
-
-To start using Automation Tool 45, you can run the following command to initiate a trading session with your desired settings:
-
 ```bash
-python main.py --exchange binance --strategy ma_crossover --symbol BTC/USDT --amount 100
+git clone https://github.com/Developer/automation-tool-45.git
+cd automation-tool-45
+pip install -r requirements.txt
 ```
 
-This command will execute a moving average crossover strategy on the Binance exchange, trading Bitcoin with an investment amount of $100.
+Edit the `config.yaml` file with your RPC endpoint and wallet credentials.
 
-## License
+## Usage
 
-[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+```python
+from automation_tool_45 import Automator
 
-For detailed license information, please refer to the [LICENSE](LICENSE) file in this repository.
+bot = Automator()
+bot.schedule_swap(
+    input_token="WETH",
+    output_token="DAI",
+    amount=2.5,
+    interval_minutes=1440
+)
+bot.run_forever()
+```
