@@ -1,43 +1,40 @@
 import logging
+import os
+from logging.handlers import RotatingFileHandler
 
-class Logger:
-    def __init__(self, log_file='app.log'):
-        # Set up the logger
-        self.logger = logging.getLogger('CryptoLogger')
-        self.logger.setLevel(logging.DEBUG)
+def setup_logger(name: str = "crypto_bot") -> logging.Logger:
+    """Configure and return a rotating file logger for automation tasks."""
+    log_dir = "logs"
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+        
+    log_file = os.path.join(log_dir, "automation.log")
+    
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.INFO)
+    
+    if not logger.handlers:
+        # File handler with 5MB rotation and 3 backups
+        file_handler = RotatingFileHandler(
+            log_file, maxBytes=5 * 1024 * 1024, backupCount=3
+        )
+        file_handler.setLevel(logging.INFO)
+        
+        # Console handler for real-time monitoring
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.INFO)
+        
+        # Standard formatting suitable for crypto operations
+        formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        )
+        
+        file_handler.setFormatter(formatter)
+        console_handler.setFormatter(formatter)
+        
+        logger.addHandler(file_handler)
+        logger.addHandler(console_handler)
+        
+    return logger
 
-        # Create file handler
-        fh = logging.FileHandler(log_file)
-        fh.setLevel(logging.DEBUG)
-
-        # Create console handler
-        ch = logging.StreamHandler()
-        ch.setLevel(logging.ERROR)
-
-        # Create a formatter
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        fh.setFormatter(formatter)
-        ch.setFormatter(formatter)
-
-        # Add handlers to the logger
-        self.logger.addHandler(fh)
-        self.logger.addHandler(ch)
-
-    def debug(self, msg):
-        self.logger.debug(msg)
-
-    def info(self, msg):
-        self.logger.info(msg)
-
-    def warning(self, msg):
-        self.logger.warning(msg)
-
-    def error(self, msg):
-        self.logger.error(msg)
-
-    def critical(self, msg):
-        self.logger.critical(msg)
-
-# Example usage:
-# logger = Logger()
-# logger.info('This is an info message')
+logger = setup_logger()
