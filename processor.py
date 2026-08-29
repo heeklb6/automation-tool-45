@@ -1,37 +1,58 @@
-import requests
-import json
-from exceptions import CustomError
+import time
+import random
 
-class CryptoProcessor:
-    def __init__(self, api_url):
-        self.api_url = api_url
+class Processor:
+    def __init__(self, max_retries=3, base_delay=1):
+        self.max_retries = max_retries
+        self.base_delay = base_delay
 
-    def fetch_data(self):
-        try:
-            response = requests.get(self.api_url)
-            response.raise_for_status()  # Raise an error for bad responses
-        except requests.exceptions.HTTPError as http_err:
-            raise CustomError(f'HTTP error occurred: {http_err}')
-        except requests.exceptions.ConnectionError:
-            raise CustomError('Could not connect to the server')
-        except requests.exceptions.Timeout:
-            raise CustomError('Request timed out')
-        except requests.exceptions.RequestException as err:
-            raise CustomError(f'An error occurred: {err}')
-        return response.json()
+    def execute_with_retry(self, func, *args, **kwargs):
+        # Retry logic for network operations in crypto automation
+        last_error = None
+        for attempt in range(1, self.max_retries + 1):
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                last_error = e
+                if attempt == self.max_retries:
+                    break
+                delay = self.base_delay * (2 ** (attempt - 1))
+                delay += random.uniform(0, 0.5)  # jitter
+                time.sleep(delay)
+        raise last_error
 
-    def process_data(self, data):
-        if not isinstance(data, dict):
-            raise CustomError('Invalid data format, expected dict')
-        # Processing logic goes here...
-        return data  # Assuming processing returns modified data
+    def fetch_price(self, symbol):
+        # Simulate network call to crypto exchange API
+        def network_call():
+            # Replace with actual requests.get in production
+            if random.random() < 0.4:
+                raise ConnectionError("Simulated network failure")
+            # Mock response for crypto price
+            mock_prices = {
+                "BTC": 65000.50,
+                "ETH": 2600.75,
+                "SOL": 150.25
+            }
+            return mock_prices.get(symbol, 0.0)
+
+        return self.execute_with_retry(network_call)
+
+    def broadcast_transaction(self, tx_data):
+        # Retry sending transaction to blockchain node
+        def network_call():
+            if random.random() < 0.25:
+                raise TimeoutError("Network timeout during broadcast")
+            return "Transaction broadcast successful: " + tx_data[:10] + "..."
+
+        return self.execute_with_retry(network_call)
 
 # Usage example
-if __name__ == '__main__':
-    processor = CryptoProcessor('https://api.coingecko.com/api/v3/coins/markets')
+if __name__ == "__main__":
+    proc = Processor(max_retries=4, base_delay=0.5)
     try:
-        data = processor.fetch_data()
-        processed_data = processor.process_data(data)
-        print(json.dumps(processed_data, indent=2))
-    except CustomError as e:
-        print(f'Error: {e}')
+        price = proc.fetch_price("BTC")
+        print(f"Price: {price}")
+        tx = proc.broadcast_transaction("0xabc123def456")
+        print(tx)
+    except Exception as e:
+        print(f"Operation failed: {e}")
