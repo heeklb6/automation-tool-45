@@ -1,67 +1,64 @@
-import time
+import re
+from datetime import datetime
 import hashlib
-import json
-from typing import Dict, Any, List
 
-def hash_seed(seed: str) -> str:
-    """Create hash from seed for deterministic wallet generation."""
-    return hashlib.sha256(seed.encode('utf-8')).hexdigest()
+def to_wei(amount: float, unit: str = "ether") -> int:
+    """Convert amount to smallest unit like wei."""
+    conversion_rates = {
+        "wei": 1,
+        "gwei": 1_000_000_000,
+        "ether": 1_000_000_000_000_000_000,
+        "satoshi": 1,
+        "bitcoin": 100_000_000
+    }
+    if unit not in conversion_rates:
+        raise ValueError("Unsupported unit")
+    rate = conversion_rates[unit]
+    return int(amount * rate)
 
-def validate_address(address: str) -> bool:
-    """Validate ethereum style address."""
-    if not address or not address.startswith('0x'):
-        return False
-    if len(address) != 42:
-        return False
-    try:
-        int(address[2:], 16)
-        return True
-    except ValueError:
-        return False
+def from_wei(amount: int, unit: str = "ether") -> float:
+    """Convert from smallest unit back to standard."""
+    conversion_rates = {
+        "wei": 1,
+        "gwei": 1_000_000_000,
+        "ether": 1_000_000_000_000_000_000,
+        "satoshi": 1,
+        "bitcoin": 100_000_000
+    }
+    if unit not in conversion_rates:
+        raise ValueError("Unsupported unit")
+    rate = conversion_rates[unit]
+    return amount / rate
 
-def to_wei(amount: float, decimals: int = 18) -> int:
-    """Convert decimal amount to wei."""
-    return int(amount * (10 ** decimals))
+def validate_address(address: str, chain: str = "ethereum") -> bool:
+    """Validate address for given chain."""
+    if chain == "ethereum":
+        pattern = r"^0x[0-9a-fA-F]{40}$"
+        return bool(re.match(pattern, address))
+    elif chain == "bitcoin":
+        if len(address) < 26 or len(address) > 35:
+            return False
+        return address[0] in "13" and bool(re.match(r"^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$", address))
+    return False
 
-def from_wei(amount: int, decimals: int = 18) -> float:
-    """Convert wei back to decimal."""
-    return amount / (10 ** decimals)
+def calculate_gas_fee(gas_limit: int, gas_price_gwei: float) -> float:
+    """Calculate gas fee in ether."""
+    gas_price_wei = gas_price_gwei * 1_000_000_000
+    total_wei = gas_limit * gas_price_wei
+    return total_wei / 1_000_000_000_000_000_000
 
-def apply_rate_limit(calls_per_second: float = 1.0) -> None:
-    """Delay to respect API rate limits."""
-    time.sleep(1.0 / calls_per_second)
+def get_current_timestamp() -> int:
+    """Return current unix timestamp."""
+    return int(datetime.now().timestamp())
 
-def load_config_from_json(config_str: str) -> Dict[str, Any]:
-    """Parse configuration from JSON string."""
-    try:
-        return json.loads(config_str)
-    except (json.JSONDecodeError, TypeError):
-        return {}
+def format_crypto_amount(amount: float, decimals: int = 8) -> str:
+    """Format amount with specified decimals."""
+    return f"{amount:.{decimals}f}"
 
-class CryptoHelpers:
-    """Organized helpers for crypto operations after reorganization."""
-    def __init__(self, default_network: str = "mainnet"):
-        self.default_network = default_network
-        self.transaction_log: List[Dict[str, Any]] = []
+def hash_transaction(tx_data: str) -> str:
+    """Generate hash for transaction data."""
+    return hashlib.sha256(tx_data.encode('utf-8')).hexdigest()
 
-    def create_transaction(self, sender: str, receiver: str, amount: float) -> Dict[str, Any]:
-        """Create a basic transaction object."""
-        if not validate_address(sender) or not validate_address(receiver):
-            raise ValueError("Invalid sender or receiver address")
-        tx = {
-            "sender": sender,
-            "receiver": receiver,
-            "amount_wei": to_wei(amount),
-            "network": self.default_network,
-            "timestamp": time.time()
-        }
-        self.transaction_log.append(tx)
-        return tx
-
-    def get_transaction_count(self) -> int:
-        """Return number of transactions created."""
-        return len(self.transaction_log)
-
-    def export_log(self) -> str:
-        """Export log as JSON string."""
-        return json.dumps(self.transaction_log, indent=2)
+def is_valid_amount(amount: float) -> bool:
+    """Check if amount is valid positive number."""
+    return isinstance(amount, (int, float)) and amount > 0
