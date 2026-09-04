@@ -1,76 +1,42 @@
 import json
 import os
-from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
-DEFAULTS: Dict[str, Any] = {
-    "api_key": "",
-    "api_secret": "",
-    "exchange": "binance",
-    "network": "mainnet",
-    "trading_pairs": ["BTC/USDT"],
-    "max_position_size": 1000,
-    "risk_percentage": 2.0,
+DEFAULT_CONFIG = {
+    "rpc_url": "https://mainnet.infura.io/v3/",
+    "max_retries": 3,
     "timeout": 30,
-    "retries": 3,
     "log_level": "INFO",
-    "dry_run": True,
+    "dry_run": True
 }
 
-class ConfigLoader:
-    """Loads and manages configuration with defaults for crypto automation."""
+def load_config(config_path: str = "config.json") -> Dict[str, Any]:
+    """
+    Loads configuration from a JSON file, merging with default values.
+    """
+    config = DEFAULT_CONFIG.copy()
 
-    def __init__(self, config_path: str = "config.json") -> None:
-        self.config_path = Path(config_path)
-        self.config: Dict[str, Any] = DEFAULTS.copy()
-        self.load()
+    if not os.path.exists(config_path):
+        return config
 
-    def load(self) -> None:
-        """Load config from file if exists, merging with defaults."""
-        if self.config_path.exists():
-            try:
-                with open(self.config_path, "r", encoding="utf-8") as f:
-                    user_config = json.load(f)
-                if isinstance(user_config, dict):
-                    self.config.update(user_config)
-            except (json.JSONDecodeError, IOError, OSError) as e:
-                print(f"Config load error: {e}. Using defaults only.")
+    try:
+        with open(config_path, "r") as f:
+            user_config = json.load(f)
+            config.update(user_config)
+    except (json.JSONDecodeError, IOError):
+        pass
 
-        self._apply_env_overrides()
+    return config
 
-    def _apply_env_overrides(self) -> None:
-        """Apply environment variable overrides where applicable."""
-        for key, default_value in DEFAULTS.items():
-            env_var = f"AUTO_{key.upper()}"
-            if env_var in os.environ:
-                env_value = os.environ[env_var]
-                if isinstance(default_value, bool):
-                    self.config[key] = env_value.lower() in ("true", "1", "yes")
-                elif isinstance(default_value, int):
-                    try:
-                        self.config[key] = int(env_value)
-                    except ValueError:
-                        pass
-                elif isinstance(default_value, float):
-                    try:
-                        self.config[key] = float(env_value)
-                    except ValueError:
-                        pass
-                else:
-                    self.config[key] = env_value
+def validate_config(config: Dict[str, Any]) -> bool:
+    """
+    Basic validation for essential crypto configuration keys.
+    """
+    required_keys = ["rpc_url", "max_retries"]
+    return all(key in config for key in required_keys)
 
-    def get(self, key: str, default: Optional[Any] = None) -> Any:
-        """Get a config value with optional default."""
-        return self.config.get(key, default)
-
-    def get_all(self) -> Dict[str, Any]:
-        """Return the full configuration dictionary."""
-        return self.config.copy()
-
-    def save(self) -> None:
-        """Save current config to file."""
-        try:
-            with open(self.config_path, "w", encoding="utf-8") as f:
-                json.dump(self.config, f, indent=2)
-        except IOError as e:
-            print(f"Failed to save config: {e}")
+if __name__ == "__main__":
+    # Example usage for automation-tool-45
+    current_config = load_config()
+    if validate_config(current_config):
+        print(f"Loaded config with RPC: {current_config['rpc_url']}")
