@@ -1,27 +1,38 @@
-import json
-import requests
-from datetime import datetime
+import logging
+import os
+from logging.handlers import RotatingFileHandler
 
-class CryptoDataError(Exception):
-    pass
-
-def fetch_crypto_price(symbol: str) -> dict:
-    try:
-        url = f'https://api.coindesk.com/v1/bpi/currentprice/{symbol}.json'
-        response = requests.get(url)
-        response.raise_for_status()  # Raise an exception for HTTP errors
-        data = response.json()
-        return {
-            'symbol': symbol,
-            'price': data['bpi'][symbol]['rate_float'],
-            'currency': data['bpi'][symbol]['code'],
-            'time': datetime.utcfromtimestamp(data['time']['updatedISO']).isoformat(),
-        }
-    except requests.exceptions.RequestException as e:
-        raise CryptoDataError(f'Failed to fetch price data: {e}') from e
-    except (KeyError, TypeError) as e:
-        raise CryptoDataError('Error parsing crypto price data') from e
-
-# Example usage (commented out)
-# price_info = fetch_crypto_price('USD')
-# print(price_info)  
+def setup_logger(name: str = "automation_tool") -> logging.Logger:
+    """
+    Configures and returns a logger with rotating file and stream handlers.
+    """
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.INFO)
+    
+    # Prevent duplicate handlers if the logger is initialized multiple times
+    if not logger.handlers:
+        log_format = logging.Formatter(
+            "[%(asctime)s] %(levelname)s [%(name)s:%(filename)s:%(lineno)d] - %(message)s"
+        )
+        
+        # Ensure the log directory exists in the environment
+        log_dir = "logs"
+        os.makedirs(log_dir, exist_ok=True)
+        log_file = os.path.join(log_dir, "crypto_bot.log")
+        
+        # Rotate log file at 5MB limit, keeping up to 5 historic log backups
+        file_handler = RotatingFileHandler(
+            log_file, maxBytes=5 * 1024 * 1024, backupCount=5, encoding="utf-8"
+        )
+        file_handler.setFormatter(log_format)
+        file_handler.setLevel(logging.INFO)
+        
+        # Add a console stream handler for immediate terminal feedback
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(log_format)
+        console_handler.setLevel(logging.INFO)
+        
+        logger.addHandler(file_handler)
+        logger.addHandler(console_handler)
+        
+    return logger
