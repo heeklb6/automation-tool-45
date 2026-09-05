@@ -1,42 +1,32 @@
-import logging
-from typing import List, Dict, Optional
+import decimal
+from typing import Dict, Optional
 
-# Configure crypto automation logger
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger('automation-tool-45')
+def sanitize_price(raw_price: any) -> decimal.Decimal:
+    """Converts raw API data to a standard Decimal type."""
+    try:
+        return decimal.Decimal(str(raw_price))
+    except (decimal.InvalidOperation, ValueError):
+        return decimal.Decimal('0.0')
 
-class CryptoProcessor:
-    def __init__(self, api_key: str, secret: str):
-        self.api_key = api_key
-        self.secret = secret
+def calculate_position_size(balance: decimal.Decimal, risk_pct: float, stop_loss_dist: decimal.Decimal) -> decimal.Decimal:
+    """Calculates position size based on equity risk percentage."""
+    if stop_loss_dist <= 0:
+        return decimal.Decimal('0')
+    
+    risk_amount = balance * decimal.Decimal(str(risk_pct))
+    return risk_amount / stop_loss_dist
 
-    def fetch_balances(self) -> Dict[str, float]:
-        """Mock retrieval of portfolio balances."""
-        return {'BTC': 0.5, 'ETH': 10.0}
+def format_crypto_pair(base: str, quote: str) -> str:
+    """Standardizes ticker formatting for exchanges."""
+    return f"{base.upper()}/{quote.upper()}"
 
-    def execute_trade(self, symbol: str, amount: float, side: str) -> bool:
-        """Process market order execution logic."""
-        if amount <= 0:
-            logger.error(f'Invalid amount: {amount}')
-            return False
-            
-        logger.info(f'Executing {side} {amount} {symbol}')
-        return True
-
-class AutomationEngine:
-    def __init__(self, processor: CryptoProcessor):
-        self.processor = processor
-
-    def run_cycle(self, targets: List[str]) -> None:
-        """Iterate through trade targets and manage state."""
-        balances = self.processor.fetch_balances()
-        for target in targets:
-            if target in balances:
-                success = self.processor.execute_trade(target, 0.1, 'BUY')
-                if not success:
-                    logger.warning(f'Trade failed for {target}')
-
-if __name__ == '__main__':
-    proc = CryptoProcessor('key', 'secret')
-    engine = AutomationEngine(proc)
-    engine.run_cycle(['BTC', 'ETH'])
+def parse_order_response(data: Dict) -> Optional[Dict]:
+    """Extracts core fields from raw exchange JSON responses."""
+    if not data or 'id' not in data:
+        return None
+    
+    return {
+        'order_id': data.get('id'),
+        'status': data.get('status', 'unknown'),
+        'filled': sanitize_price(data.get('filled_size', 0))
+    }
