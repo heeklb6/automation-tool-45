@@ -1,32 +1,52 @@
-import decimal
-from typing import Dict, Optional
+import logging
 
-def sanitize_price(raw_price: any) -> decimal.Decimal:
-    """Converts raw API data to a standard Decimal type."""
-    try:
-        return decimal.Decimal(str(raw_price))
-    except (decimal.InvalidOperation, ValueError):
-        return decimal.Decimal('0.0')
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-def calculate_position_size(balance: decimal.Decimal, risk_pct: float, stop_loss_dist: decimal.Decimal) -> decimal.Decimal:
-    """Calculates position size based on equity risk percentage."""
-    if stop_loss_dist <= 0:
-        return decimal.Decimal('0')
-    
-    risk_amount = balance * decimal.Decimal(str(risk_pct))
-    return risk_amount / stop_loss_dist
 
-def format_crypto_pair(base: str, quote: str) -> str:
-    """Standardizes ticker formatting for exchanges."""
-    return f"{base.upper()}/{quote.upper()}"
+class TradeProcessor:
+    SUPPORTED_SYMBOLS = {"BTC", "ETH", "SOL", "USDT"}
 
-def parse_order_response(data: Dict) -> Optional[Dict]:
-    """Extracts core fields from raw exchange JSON responses."""
-    if not data or 'id' not in data:
-        return None
-    
-    return {
-        'order_id': data.get('id'),
-        'status': data.get('status', 'unknown'),
-        'filled': sanitize_price(data.get('filled_size', 0))
-    }
+    def __init__(self, min_order_usd=10.0, max_order_usd=50000.0):
+        self.min_order_usd = min_order_usd
+        self.max_order_usd = max_order_usd
+
+    def validate_trade_signal(self, signal: dict) -> bool:
+        """Validates raw signal payload prior to execution."""
+        if not isinstance(signal, dict):
+            raise ValueError("Payload must be a dictionary")
+
+        symbol = signal.get("symbol")
+        if not symbol or symbol not in self.SUPPORTED_SYMBOLS:
+            raise ValueError(f"Unsupported symbol: '{symbol}'")
+
+        side = signal.get("side")
+        if side not in {"BUY", "SELL"}:
+            raise ValueError(f"Invalid side: '{side}'. Must be BUY or SELL")
+
+        amount = signal.get("amount")
+        if not isinstance(amount, (int, float)) or amount <= 0:
+            raise ValueError(f"Invalid trade amount: {amount}")
+
+        price = signal.get("price")
+        if not isinstance(price, (int, float)) or price <= 0:
+            raise ValueError(f"Invalid trade price: {price}")
+
+        total_value = amount * price
+        if not (self.min_order_usd <= total_value <= self.max_order_usd):
+            raise ValueError(f"Order value ${total_value:.2f} out of bounds")
+
+        return True
+
+    def process_signals(self, raw_signals: list) -> int:
+        """Iterates over incoming signals, enforcing input validation before execution."""
+        successful_orders = 0
+        for idx, signal in enumerate(raw_signals, start=1):
+            try:
+                self.validate_trade_signal(signal)
+                logging.info(f"Processing [{idx}/{len(raw_signals)}]: {signal['side']} {signal['amount']} {signal['symbol']}")
+                successful_orders += 1
+            except ValueError as err:
+                logging.warning(f"Skipping invalid signal [{idx}/{len(raw_signals)}]: {err}")
+                continue
+
+        return successful_orders
