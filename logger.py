@@ -1,39 +1,46 @@
+import os
 import logging
 from logging.handlers import RotatingFileHandler
-from pathlib import Path
 
-def setup_logger(logger_name: str = "crypto_automation", log_dir: str = "logs", max_size_mb: int = 5, backup_count: int = 3) -> logging.Logger:
-    """Set up a logger with rotating file handler."""
-    # Ensure log directory exists
-    log_path = Path(log_dir)
-    log_path.mkdir(parents=True, exist_ok=True)
-    log_file = log_path / f"{logger_name}.log"
-    logger = logging.getLogger(logger_name)
-    if logger.hasHandlers():
-        logger.handlers.clear()
+def setup_logger(name: str = "crypto_bot", log_file: str = "logs/app.log") -> logging.Logger:
+    """
+    Configures and returns a logger with both console and rotating file handlers.
+    Automatically creates the log directory if it does not exist.
+    """
+    log_dir = os.path.dirname(log_file)
+    if log_dir and not os.path.exists(log_dir):
+        os.makedirs(log_dir, exist_ok=True)
+
+    logger = logging.getLogger(name)
     logger.setLevel(logging.INFO)
-    # Rotating file handler for log rotation
+
+    # Prevent duplicate handlers if logger is already initialized
+    if logger.handlers:
+        return logger
+
+    # Format output with timestamps, levels, and source modules
+    log_format = logging.Formatter(
+        fmt="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S"
+    )
+
+    # Rotating file handler (limit size to 5MB, keep up to 3 backup files)
     file_handler = RotatingFileHandler(
         log_file,
-        maxBytes=max_size_mb * 1024 * 1024,
-        backupCount=backup_count
+        maxBytes=5 * 1024 * 1024,
+        backupCount=3,
+        encoding="utf-8"
     )
-    file_formatter = logging.Formatter(
-        "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-    )
-    file_handler.setFormatter(file_formatter)
-    logger.addHandler(file_handler)
-    # Console handler for immediate feedback
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(file_formatter)
-    logger.addHandler(console_handler)
-    return logger
+    file_handler.setFormatter(log_format)
+    file_handler.setLevel(logging.INFO)
 
-# Example usage in crypto automation context
-if __name__ == "__main__":
-    logger = setup_logger()
-    logger.info("Starting crypto automation tool")
-    logger.warning("Sample warning for testing rotation")
-    # Simulate logging to trigger rotation if needed
-    for i in range(10):
-        logger.debug(f"Processing crypto transaction {i}")
+    # Stream handler for standard stdout output
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(log_format)
+    console_handler.setLevel(logging.INFO)
+
+    # Attach handlers to the logger instance
+    logger.addHandler(file_handler)
+    logger.addHandler(console_handler)
+
+    return logger
