@@ -1,30 +1,28 @@
-import time
 import logging
-from functools import wraps
-from requests.exceptions import RequestException
+from typing import Dict, Any
+from core import CryptoEngine
 
-logger = logging.getLogger("automation-tool-45")
+logger = logging.getLogger(__name__)
 
-def retry_network_operation(max_retries=3, delay=2, backoff=2):
-    def decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            current_delay = delay
-            for attempt in range(1, max_retries + 1):
-                try:
-                    return func(*args, **kwargs)
-                except RequestException as e:
-                    logger.warning(f"Network error on attempt {attempt}/{max_retries}: {e}")
-                    if attempt == max_retries:
-                        logger.error("Max retries reached. Operation failed.")
-                        raise
-                    time.sleep(current_delay)
-                    current_delay *= backoff
-        return wrapper
-    return decorator
+class TransactionHandler:
+    """Handles execution flow for automated crypto trades."""
 
-@retry_network_operation(max_retries=3, delay=1)
-def fetch_crypto_ticker(session, url):
-    response = session.get(url, timeout=10)
-    response.raise_for_status()
-    return response.json()
+    def __init__(self, engine: CryptoEngine):
+        self.engine = engine
+
+    def process_request(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Validates and executes trade requests."""
+        if not self._is_valid(data):
+            return {"status": "error", "message": "invalid payload"}
+
+        try:
+            result = self.engine.execute(data)
+            return {"status": "success", "tx_id": result}
+        except Exception as e:
+            logger.error(f"Execution failure: {e}")
+            return {"status": "error", "message": str(e)}
+
+    def _is_valid(self, data: Dict[str, Any]) -> bool:
+        """Basic structure validation for incoming orders."""
+        required = ['asset', 'amount', 'side']
+        return all(key in data for key in required)
