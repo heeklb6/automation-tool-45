@@ -1,46 +1,32 @@
+import time
+import functools
 import logging
-from typing import Dict, List, Optional
+from typing import Callable, Any
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('automation-tool-45')
 
-class CryptoAutomator:
-    """Core engine for executing crypto trade strategies."""
-    
-    def __init__(self, api_key: str, base_currency: str = "USDT"):
-        self.api_key = api_key
-        self.base_currency = base_currency
-        self.active_positions: Dict[str, float] = {}
+def retry_network_call(retries: int = 3, delay: float = 1.5):
+    """Decorator for retrying network operations with exponential backoff."""
+    def decorator(func: Callable):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs) -> Any:
+            last_exception = None
+            current_delay = delay
+            for attempt in range(retries):
+                try:
+                    return func(*args, **kwargs)
+                except (ConnectionError, TimeoutError) as e:
+                    last_exception = e
+                    logger.warning(f"Attempt {attempt + 1} failed: {e}. Retrying in {current_delay}s...")
+                    time.sleep(current_delay)
+                    current_delay *= 2
+            logger.error(f"Operation failed after {retries} attempts.")
+            raise last_exception
+        return wrapper
+    return decorator
 
-    def validate_connection(self) -> bool:
-        """Check connectivity to exchange nodes."""
-        return bool(self.api_key)
-
-    def fetch_market_data(self, symbol: str) -> Optional[float]:
-        """Retrieve current price for target ticker."""
-        try:
-            # Placeholder for actual exchange API request
-            return 50000.0
-        except Exception as e:
-            logger.error(f"failed to fetch data for {symbol}: {e}")
-            return None
-
-    def execute_order(self, symbol: str, quantity: float, side: str) -> bool:
-        """Process trade execution logic."""
-        if side not in ['buy', 'sell']:
-            return False
-        
-        logger.info(f"executing {side} order for {quantity} {symbol}")
-        self.active_positions[symbol] = quantity
-        return True
-
-    def run_cycle(self, targets: List[str]) -> None:
-        """Main loop iteration for batch processing."""
-        if not self.validate_connection():
-            logger.error("connection validation failed")
-            return
-            
-        for symbol in targets:
-            price = self.fetch_market_data(symbol)
-            if price:
-                logger.info(f"{symbol} current price: {price}")
+@retry_network_call(retries=3)
+def fetch_crypto_price(ticker: str) -> float:
+    """Example network-bound function to fetch price data."""
+    # Placeholder for actual network request logic
+    return 0.0
