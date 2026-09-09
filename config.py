@@ -1,30 +1,23 @@
 import os
-from typing import Dict, Any
+from dataclasses import dataclass
 
-class Config:
-    """Configuration manager for the crypto automation tool."""
+@dataclass(frozen=True)
+class AppConfig:
+    API_KEY: str = os.getenv("CRYPTO_API_KEY", "")
+    API_SECRET: str = os.getenv("CRYPTO_API_SECRET", "")
+    BASE_URL: str = "https://api.exchange.com/v1"
+    TIMEOUT: int = 30
+    MAX_RETRIES: int = 3
 
-    def __init__(self, env: str = "production") -> None:
-        self.env: str = env
-        self.api_key: str = os.getenv("CRYPTO_API_KEY", "")
-        self.timeout: int = int(os.getenv("REQUEST_TIMEOUT", "30"))
-        self.base_url: str = "https://api.exchange.com/v1"
+def load_config() -> AppConfig:
+    """Initializes application configuration from environment variables."""
+    return AppConfig(
+        API_KEY=os.getenv("CRYPTO_API_KEY", ""),
+        API_SECRET=os.getenv("CRYPTO_API_SECRET", ""),
+        BASE_URL=os.getenv("BASE_URL", "https://api.exchange.com/v1"),
+        TIMEOUT=int(os.getenv("REQUEST_TIMEOUT", "30")),
+        MAX_RETRIES=int(os.getenv("MAX_RETRIES", "3"))
+    )
 
-    def get_headers(self) -> Dict[str, str]:
-        """Return authentication headers for exchange requests."""
-        return {
-            "X-API-KEY": self.api_key,
-            "Content-Type": "application/json"
-        }
-
-    @classmethod
-    def validate(cls, settings: Dict[str, Any]) -> bool:
-        """Validate configuration dictionary structure."""
-        required_keys = ["api_key", "timeout"]
-        return all(key in settings for key in required_keys)
-
-DEFAULT_CONFIG: Dict[str, Any] = {
-    "api_key": "",
-    "timeout": 30,
-    "retries": 3
-}
+# Global configuration instance for cross-module usage
+settings = load_config()
