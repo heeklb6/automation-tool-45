@@ -1,31 +1,36 @@
+import logging
 import time
-import decimal
-from typing import Union
+from typing import Any, Callable, Optional
 
-def format_crypto_amount(amount: Union[float, str, decimal.Decimal], precision: int = 8) -> str:
-    """Normalize crypto amounts to string with defined precision."""
-    val = decimal.Decimal(str(amount))
-    return format(val, f'.{precision}f')
+logger = logging.getLogger(__name__)
 
-def retry_on_failure(retries: int = 3, delay: float = 1.0):
-    """Decorator for retrying operations on transient network issues."""
-    def decorator(func):
-        def wrapper(*args, **kwargs):
+def retry_on_failure(retries: int = 3, delay: float = 1.0) -> Callable:
+    """Decorator for handling transient crypto API connection issues."""
+    def decorator(func: Callable) -> Callable:
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             last_exception = None
-            for i in range(retries):
+            for attempt in range(retries):
                 try:
                     return func(*args, **kwargs)
-                except Exception as e:
+                except (ConnectionError, TimeoutError) as e:
                     last_exception = e
-                    time.sleep(delay * (2 ** i))
+                    logger.warning(f"Attempt {attempt + 1} failed: {e}")
+                    time.sleep(delay * (2 ** attempt))
+            logger.error(f"Max retries reached. Final error: {last_exception}")
             raise last_exception
         return wrapper
     return decorator
 
-def validate_ticker(ticker: str) -> bool:
-    """Ensure ticker follows standard uppercase crypto format."""
-    return bool(ticker and ticker.isupper() and 2 <= len(ticker) <= 10)
+def validate_wallet_address(address: str) -> bool:
+    """Basic structure validation for crypto wallet strings."""
+    if not isinstance(address, str) or len(address) < 26 or len(address) > 42:
+        return False
+    return address.isalnum()
 
-def get_timestamp_ms() -> int:
-    """Generate current epoch time in milliseconds for API signatures."""
-    return int(time.time() * 1000)
+def safe_execute(func: Callable, default: Any = None) -> Any:
+    """Generic execution wrapper for edge case safety."""
+    try:
+        return func()
+    except Exception as e:
+        logger.error(f"Execution error in {func.__name__}: {e}")
+        return default
