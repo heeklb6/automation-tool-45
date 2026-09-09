@@ -1,45 +1,31 @@
-import os
 import logging
 from logging.handlers import RotatingFileHandler
+import os
 
-def setup_logger(name: str = "crypto_bot", log_file: str = "logs/app.log") -> logging.Logger:
-    """
-    Configures and returns a logger with both console and rotating file handlers.
-    Automatically creates the log directory if it does not exist.
-    """
-    log_dir = os.path.dirname(log_file)
-    if log_dir and not os.path.exists(log_dir):
-        os.makedirs(log_dir, exist_ok=True)
-
+def setup_logger(name: str = "automation-tool-45") -> logging.Logger:
+    """Configures a rotating file logger for crypto operations."""
     logger = logging.getLogger(name)
     logger.setLevel(logging.INFO)
 
-    # Prevent duplicate handlers if logger is already initialized
-    if logger.handlers:
-        return logger
+    if not os.path.exists("logs"):
+        os.makedirs("logs")
 
-    # Format output with timestamps, levels, and source modules
-    log_format = logging.Formatter(
-        fmt="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
 
-    # Rotating file handler (limit size to 5MB, keep up to 3 backup files)
+    # Setup rotating file handler: 5MB per file, keep 5 backups
     file_handler = RotatingFileHandler(
-        log_file,
+        filename="logs/app.log",
         maxBytes=5 * 1024 * 1024,
-        backupCount=3,
-        encoding="utf-8"
+        backupCount=5
     )
-    file_handler.setFormatter(log_format)
-    file_handler.setLevel(logging.INFO)
+    file_handler.setFormatter(formatter)
 
-    # Stream handler for standard stdout output
+    # Setup console handler for visibility
     console_handler = logging.StreamHandler()
-    console_handler.setFormatter(log_format)
-    console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(formatter)
 
-    # Attach handlers to the logger instance
     logger.addHandler(file_handler)
     logger.addHandler(console_handler)
 
