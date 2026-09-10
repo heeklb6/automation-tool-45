@@ -1,23 +1,33 @@
+import json
 import os
-from dataclasses import dataclass
+from typing import Dict, Any
 
-@dataclass(frozen=True)
-class AppConfig:
-    API_KEY: str = os.getenv("CRYPTO_API_KEY", "")
-    API_SECRET: str = os.getenv("CRYPTO_API_SECRET", "")
-    BASE_URL: str = "https://api.exchange.com/v1"
-    TIMEOUT: int = 30
-    MAX_RETRIES: int = 3
+DEFAULT_CONFIG = {
+    "rpc_url": "https://api.mainnet-beta.solana.com",
+    "timeout": 30,
+    "retry_attempts": 3,
+    "log_level": "INFO"
+}
 
-def load_config() -> AppConfig:
-    """Initializes application configuration from environment variables."""
-    return AppConfig(
-        API_KEY=os.getenv("CRYPTO_API_KEY", ""),
-        API_SECRET=os.getenv("CRYPTO_API_SECRET", ""),
-        BASE_URL=os.getenv("BASE_URL", "https://api.exchange.com/v1"),
-        TIMEOUT=int(os.getenv("REQUEST_TIMEOUT", "30")),
-        MAX_RETRIES=int(os.getenv("MAX_RETRIES", "3"))
-    )
+def load_config(config_path: str = "config.json") -> Dict[str, Any]:
+    """
+    Loads configuration from JSON file with fallback to defaults.
+    """
+    config = DEFAULT_CONFIG.copy()
+    
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, 'r') as f:
+                user_config = json.load(f)
+                config.update(user_config)
+        except (json.JSONDecodeError, IOError) as e:
+            print(f"Warning: Failed to load {config_path}: {e}. Using defaults.")
+            
+    return config
 
-# Global configuration instance for cross-module usage
-settings = load_config()
+def validate_config(config: Dict[str, Any]) -> bool:
+    """
+    Basic schema validation for essential crypto parameters.
+    """
+    required_keys = ["rpc_url", "timeout"]
+    return all(key in config for key in required_keys)
