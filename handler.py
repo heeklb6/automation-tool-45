@@ -1,28 +1,38 @@
+import time
 import logging
-from typing import Dict, Any
-from core import CryptoEngine
+from typing import Callable, Any, Optional
 
 logger = logging.getLogger(__name__)
 
-class TransactionHandler:
-    """Handles execution flow for automated crypto trades."""
+def with_retry(retries: int = 3, delay: float = 1.0, backoff: float = 2.0):
+    """Decorator to retry network-bound operations with exponential backoff."""
+    def decorator(func: Callable):
+        def wrapper(*args, **kwargs) -> Any:
+            current_delay = delay
+            for attempt in range(retries):
+                try:
+                    return func(*args, **kwargs)
+                except (ConnectionError, TimeoutError) as e:
+                    if attempt == retries - 1:
+                        logger.error(f"Final attempt failed: {e}")
+                        raise
+                    logger.warning(f"Attempt {attempt + 1} failed, retrying in {current_delay}s")
+                    time.sleep(current_delay)
+                    current_delay *= backoff
+            return None
+        return wrapper
+    return decorator
 
-    def __init__(self, engine: CryptoEngine):
-        self.engine = engine
+@with_retry(retries=3, delay=0.5)
+def fetch_price_data(symbol: str):
+    """Simulated network call to crypto exchange API."""
+    # Example: request.get(f"https://api.exchange.com/v1/ticker/{symbol}")
+    print(f"Fetching price for {symbol}...")
+    # Simulate network instability
+    raise ConnectionError("API unreachable")
 
-    def process_request(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Validates and executes trade requests."""
-        if not self._is_valid(data):
-            return {"status": "error", "message": "invalid payload"}
-
-        try:
-            result = self.engine.execute(data)
-            return {"status": "success", "tx_id": result}
-        except Exception as e:
-            logger.error(f"Execution failure: {e}")
-            return {"status": "error", "message": str(e)}
-
-    def _is_valid(self, data: Dict[str, Any]) -> bool:
-        """Basic structure validation for incoming orders."""
-        required = ['asset', 'amount', 'side']
-        return all(key in data for key in required)
+if __name__ == "__main__":
+    try:
+        fetch_price_data("BTC")
+    except Exception:
+        print("Network operation failed after retries.")
