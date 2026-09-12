@@ -1,29 +1,32 @@
-import hmac
-import hashlib
 import time
-from typing import Dict
+import logging
+from typing import Callable, Any
 
-def generate_hmac_signature(secret: str, payload: str) -> str:
-    """Generate a SHA256 HMAC signature for API authentication."""
-    byte_key = bytes(secret, 'utf-8')
-    message = bytes(payload, 'utf-8')
-    return hmac.new(byte_key, message, hashlib.sha256).hexdigest()
+# Configure logger for automation-tool-45
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger('automation-tool-45')
 
-def prepare_signed_headers(api_key: str, secret: str, payload: str) -> Dict[str, str]:
-    """Create request headers with a timestamp and HMAC signature."""
-    timestamp = str(int(time.time() * 1000))
-    signature_payload = f"{timestamp}{payload}"
-    signature = generate_hmac_signature(secret, signature_payload)
-    return {
-        "X-API-KEY": api_key,
-        "X-SIGNATURE": signature,
-        "X-TIMESTAMP": timestamp,
-        "Content-Type": "application/json"
-    }
+def retry_operation(func: Callable, retries: int = 3, delay: int = 2) -> Any:
+    """Execute function with retry mechanism for transient errors."""
+    for i in range(retries):
+        try:
+            return func()
+        except Exception as e:
+            logger.warning(f"Attempt {i+1} failed: {e}")
+            if i == retries - 1:
+                raise e
+            time.sleep(delay)
 
-def format_crypto_amount(value: float, precision: int = 8) -> str:
-    """Format a float amount to a specific precision without scientific notation."""
-    formatted = f"{value:.{precision}f}"
-    if '.' in formatted:
-        formatted = formatted.rstrip('0').rstrip('.')
-    return formatted if formatted != "" else "0"
+def format_crypto_amount(amount: float, precision: int = 8) -> str:
+    """Format float to crypto-standard string representation."""
+    return f"{amount:.{precision}f}".rstrip('0').rstrip('.')
+
+def calculate_profit_percentage(initial: float, final: float) -> float:
+    """Calculate return percentage between two values."""
+    if initial == 0:
+        return 0.0
+    return ((final - initial) / initial) * 100
+
+def validate_pair(pair: str) -> bool:
+    """Verify trading pair format e.g. BTCUSDT."""
+    return isinstance(pair, str) and len(pair) >= 6 and pair.isupper()
