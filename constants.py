@@ -1,32 +1,38 @@
-from typing import Final, Dict
+import os
+from decimal import Decimal
 
-# Supported cryptocurrency ticker symbols
-SUPPORTED_ASSETS: Final[list[str]] = ['BTC', 'ETH', 'SOL', 'ADA', 'DOT']
+# Network and exchange endpoints
+API_BASE_URL = "https://api.exchange.com/v3"
+WS_BASE_URL = "wss://ws.exchange.com/v3"
 
-# API request configuration constants
-API_TIMEOUT_SECONDS: Final[int] = 30
-MAX_RETRIES: Final[int] = 3
-
-# Standardized mapping for exchange naming
-EXCHANGE_MAP: Final[Dict[str, str]] = {
-    'binance': 'BNUSDT',
-    'coinbase': 'CBUSDT',
-    'kraken': 'KRUSDT'
+# Supported trading pairs
+TRADING_PAIRS = {
+    "BTC/USDT": "BTCUSDT",
+    "ETH/USDT": "ETHUSDT",
+    "SOL/USDT": "SOLUSDT"
 }
 
-# Precision settings for decimal handling
-ASSET_PRECISION: Final[int] = 8
-FIAT_PRECISION: Final[int] = 2
+# Decimal precision settings
+PRICE_PRECISION = 8
+AMOUNT_PRECISION = 6
+FEE_RATE = Decimal("0.001")
 
-# Default headers for API connectivity
-HTTP_HEADERS: Final[Dict[str, str]] = {
-    'Content-Type': 'application/json',
-    'User-Agent': 'automation-tool-45/1.0.0'
-}
+# Order types
+ORDER_TYPE_LIMIT = "LIMIT"
+ORDER_TYPE_MARKET = "MARKET"
 
-def get_asset_info(symbol: str) -> dict:
-    """Retrieve metadata for a specific asset."""
-    return {
-        "symbol": symbol.upper(),
-        "is_active": symbol.upper() in SUPPORTED_ASSETS
-    }
+# Timeouts in seconds
+REQUEST_TIMEOUT = 10
+WS_RECONNECT_INTERVAL = 5
+
+# Default log path
+LOG_FILE = "automation-tool-45.log"
+
+# Minimum trade amounts
+MIN_ORDER_VALUE_USDT = Decimal("10.0")
+
+# Supported order statuses
+STATUS_OPEN = "OPEN"
+STATUS_FILLED = "FILLED"
+STATUS_CANCELED = "CANCELED"
+STATUS_REJECTED = "REJECTED"
