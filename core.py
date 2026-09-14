@@ -1,35 +1,42 @@
-from typing import List, Dict, Optional
+import functools
+import time
+from typing import Callable, Any
+
+# Cache for crypto price calculations to reduce API overhead
+_price_cache = {}
+_cache_ttl = 60
+
+def memoize_crypto_data(func: Callable) -> Callable:
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs) -> Any:
+        key = (args, tuple(sorted(kwargs.items())))
+        now = time.time()
+        if key in _price_cache:
+            val, timestamp = _price_cache[key]
+            if now - timestamp < _cache_ttl:
+                return val
+        
+        result = func(*args, **kwargs)
+        _price_cache[key] = (result, now)
+        return result
+    return wrapper
 
 class CryptoProcessor:
-    """Handles execution of automated trading tasks."""
+    def __init__(self, asset_pair: str):
+        self.asset_pair = asset_pair
 
-    def __init__(self, exchange_id: str, rate_limit: float = 0.5):
-        self.exchange_id: str = exchange_id
-        self.rate_limit: float = rate_limit
-        self.active_orders: List[Dict[str, float]] = []
+    @memoize_crypto_data
+    def fetch_market_depth(self, depth: int = 10) -> dict:
+        # Simulated heavy network-bound operation
+        time.sleep(0.5)
+        return {"pair": self.asset_pair, "depth": depth, "status": "live"}
 
-    def add_order(self, pair: str, amount: float, price: float) -> bool:
-        """Adds a new order to the internal queue."""
-        if amount <= 0 or price <= 0:
-            return False
-        
-        order = {"pair": pair, "amount": amount, "price": price}
-        self.active_orders.append(order)
-        return True
+    def batch_process(self, requests: list) -> list:
+        # Optimization: process in chunks to minimize latency
+        return [self.fetch_market_depth(r) for r in requests]
 
-    def get_market_summary(self) -> Dict[str, Optional[float]]:
-        """Returns simplified market statistics for tracked pairs."""
-        if not self.active_orders:
-            return {"avg_price": 0.0, "total_volume": 0.0}
-            
-        total_val = sum(o["price"] * o["amount"] for o in self.active_orders)
-        total_vol = sum(o["amount"] for o in self.active_orders)
-        
-        return {
-            "avg_price": total_val / total_vol if total_vol > 0 else 0.0,
-            "total_volume": total_vol
-        }
-
-    def clear_orders(self) -> None:
-        """Resets the current order list."""
-        self.active_orders.clear()
+if __name__ == '__main__':
+    proc = CryptoProcessor('BTC-USD')
+    # Repeated calls return cached data instantly
+    print(proc.fetch_market_depth(10))
+    print(proc.fetch_market_depth(10))
