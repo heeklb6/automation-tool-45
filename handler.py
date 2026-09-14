@@ -1,38 +1,36 @@
-import time
 import logging
-from typing import Callable, Any, Optional
+import requests
+from requests.exceptions import RequestException
 
 logger = logging.getLogger(__name__)
 
-def with_retry(retries: int = 3, delay: float = 1.0, backoff: float = 2.0):
-    """Decorator to retry network-bound operations with exponential backoff."""
-    def decorator(func: Callable):
-        def wrapper(*args, **kwargs) -> Any:
-            current_delay = delay
-            for attempt in range(retries):
-                try:
-                    return func(*args, **kwargs)
-                except (ConnectionError, TimeoutError) as e:
-                    if attempt == retries - 1:
-                        logger.error(f"Final attempt failed: {e}")
-                        raise
-                    logger.warning(f"Attempt {attempt + 1} failed, retrying in {current_delay}s")
-                    time.sleep(current_delay)
-                    current_delay *= backoff
-            return None
-        return wrapper
-    return decorator
+def execute_trade(api_client, pair: str, amount: float):
+    """Executes crypto trade with network and validation safety."""
+    if amount <= 0:
+        logger.error(f"invalid trade amount: {amount}")
+        return None
 
-@with_retry(retries=3, delay=0.5)
-def fetch_price_data(symbol: str):
-    """Simulated network call to crypto exchange API."""
-    # Example: request.get(f"https://api.exchange.com/v1/ticker/{symbol}")
-    print(f"Fetching price for {symbol}...")
-    # Simulate network instability
-    raise ConnectionError("API unreachable")
-
-if __name__ == "__main__":
     try:
-        fetch_price_data("BTC")
-    except Exception:
-        print("Network operation failed after retries.")
+        response = api_client.post("/trade", json={"pair": pair, "amount": amount})
+        response.raise_for_status()
+        return response.json()
+    except RequestException as e:
+        logger.warning(f"network failure for {pair}: {e}")
+        return None
+    except ValueError as e:
+        logger.error(f"malformed api response: {e}")
+        return None
+    except Exception as e:
+        logger.critical(f"unexpected system error: {type(e).__name__}")
+        raise
+
+def validate_balance(balance: dict, required: float):
+    """Checks funds before order placement."""
+    try:
+        available = float(balance.get('available', 0))
+        if available < required:
+            raise ValueError("insufficient funds")
+        return True
+    except (TypeError, ValueError):
+        logger.error("invalid balance data structure")
+        return False
