@@ -1,35 +1,35 @@
-import logging
-from typing import List, Dict
+from typing import List, Dict, Optional
 
-# crypto automation core logic
+class CryptoProcessor:
+    """Handles execution of automated trading tasks."""
 
-class CryptoAutomator:
-    def __init__(self, api_key: str, pair: str):
-        self.api_key = api_key
-        self.pair = pair
-        self.logger = logging.getLogger(__name__)
+    def __init__(self, exchange_id: str, rate_limit: float = 0.5):
+        self.exchange_id: str = exchange_id
+        self.rate_limit: float = rate_limit
+        self.active_orders: List[Dict[str, float]] = []
 
-    def fetch_market_data(self) -> Dict:
-        # placeholder for exchange api integration
-        return {"pair": self.pair, "price": 0.0}
-
-    def execute_trade(self, side: str, amount: float) -> bool:
-        """executes trade order on connected exchange"""
-        if amount <= 0:
-            self.logger.error("invalid trade amount")
+    def add_order(self, pair: str, amount: float, price: float) -> bool:
+        """Adds a new order to the internal queue."""
+        if amount <= 0 or price <= 0:
             return False
         
-        self.logger.info(f"executing {side} for {amount} {self.pair}")
+        order = {"pair": pair, "amount": amount, "price": price}
+        self.active_orders.append(order)
         return True
 
-    def process_queue(self, tasks: List[Dict]):
-        """processes queue of trading signals"""
-        for task in tasks:
-            success = self.execute_trade(task.get("side"), task.get("amount", 0))
-            if not success:
-                self.logger.warning("trade execution failure")
+    def get_market_summary(self) -> Dict[str, Optional[float]]:
+        """Returns simplified market statistics for tracked pairs."""
+        if not self.active_orders:
+            return {"avg_price": 0.0, "total_volume": 0.0}
+            
+        total_val = sum(o["price"] * o["amount"] for o in self.active_orders)
+        total_vol = sum(o["amount"] for o in self.active_orders)
+        
+        return {
+            "avg_price": total_val / total_vol if total_vol > 0 else 0.0,
+            "total_volume": total_vol
+        }
 
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    bot = CryptoAutomator("test_key", "BTC/USD")
-    bot.process_queue([{"side": "buy", "amount": 0.1}])
+    def clear_orders(self) -> None:
+        """Resets the current order list."""
+        self.active_orders.clear()
