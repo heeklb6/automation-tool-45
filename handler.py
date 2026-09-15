@@ -1,36 +1,35 @@
 import logging
-import requests
-from requests.exceptions import RequestException
+from typing import Dict, Any
+from core import CryptoEngine
 
 logger = logging.getLogger(__name__)
 
-def execute_trade(api_client, pair: str, amount: float):
-    """Executes crypto trade with network and validation safety."""
-    if amount <= 0:
-        logger.error(f"invalid trade amount: {amount}")
-        return None
+class TradeHandler:
+    def __init__(self, engine: CryptoEngine):
+        self.engine = engine
+        self.active_tasks = {}
 
-    try:
-        response = api_client.post("/trade", json={"pair": pair, "amount": amount})
-        response.raise_for_status()
-        return response.json()
-    except RequestException as e:
-        logger.warning(f"network failure for {pair}: {e}")
-        return None
-    except ValueError as e:
-        logger.error(f"malformed api response: {e}")
-        return None
-    except Exception as e:
-        logger.critical(f"unexpected system error: {type(e).__name__}")
-        raise
+    def handle_signal(self, payload: Dict[str, Any]) -> bool:
+        """Process incoming trading signals from webhook."""
+        symbol = payload.get("symbol")
+        side = payload.get("side")
+        
+        if not symbol or side not in ["buy", "sell"]:
+            logger.error(f"invalid signal structure: {payload}")
+            return False
 
-def validate_balance(balance: dict, required: float):
-    """Checks funds before order placement."""
-    try:
-        available = float(balance.get('available', 0))
-        if available < required:
-            raise ValueError("insufficient funds")
-        return True
-    except (TypeError, ValueError):
-        logger.error("invalid balance data structure")
-        return False
+        try:
+            order_id = self.engine.execute(symbol, side, payload.get("amount", 0))
+            self.active_tasks[order_id] = payload
+            logger.info(f"order {order_id} processed for {symbol}")
+            return True
+        except Exception as e:
+            logger.exception(f"execution failure for {symbol}: {e}")
+            return False
+
+    def cleanup_stale_orders(self):
+        """Prune local cache of completed operations."""
+        keys_to_remove = [k for k, v in self.active_tasks.items() if v.get("status") == "closed"]
+        for k in keys_to_remove:
+            del self.active_tasks[k]
+        logger.debug(f"cleanup completed, {len(keys_to_remove)} tasks removed")
