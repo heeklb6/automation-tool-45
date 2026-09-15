@@ -1,47 +1,49 @@
 # automation-tool-45
 
-A robust, high-performance Python framework designed for automated crypto-asset trading and portfolio rebalancing. This tool leverages asynchronous execution to interact with major exchange APIs, minimizing latency for time-sensitive market strategies.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+`automation-tool-45` is a high-performance Python engine designed to automate multi-DEX arbitrage execution and real-time liquidity pool monitoring across EVM-compatible networks. It empowers algorithmic traders to detect price discrepancies on-chain and execute flash-swaps with sub-second latency.
 
 ## Features
 
-*   **Multi-Exchange Support:** Seamless integration with Binance, Coinbase Pro, and Kraken APIs via a unified interface.
-*   **Asynchronous Engine:** Utilizes `asyncio` and `aiohttp` to manage concurrent order execution and real-time WebSocket market data streaming.
-*   **Strategy Backtesting:** Includes a local environment to simulate historical performance before deploying capital to live markets.
-*   **Risk Management:** Built-in circuit breakers and automated stop-loss triggers to protect assets during high-volatility events.
+* **Multi-DEX Smart Routing:** Instantly scans and compares token spreads across Uniswap v3, SushiSwap, and PancakeSwap.
+* **Gas-Optimized Execution:** Employs dynamic gas-pricing strategies and private transaction RPCs (like Flashbots) to eliminate front-running and reduce revert fees.
+* **Mempool Monitoring:** Listens to pending liquidity events via WebSockets to identify profitable arbitrage paths before they are mined.
 
 ## Installation
 
-Ensure you have Python 3.10+ installed. Clone the repository and install the required dependencies:
+Clone the repository and install the required dependencies:
 
 ```bash
 git clone https://github.com/Developer/automation-tool-45.git
 cd automation-tool-45
-python -m venv venv
-source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## Basic Usage
+*Note: Requires Python 3.9+ and an active Web3 provider URL.*
 
-Configure your API keys in the `.env` file, then initiate the bot by pointing it to your chosen strategy script:
+## Quick Start
 
-```bash
-# Example: Run the grid trading strategy
-python main.py --strategy grid_bot --pair BTC-USDT
+Initialize the tracker and begin scanning for arbitrage opportunities between WETH and USDT:
+
+```python
+from automation_tool import ArbitrageEngine
+
+# Initialize engine with your RPC node
+engine = ArbitrageEngine(
+    rpc_url="https://eth-mainnet.g.alchemy.com/v2/demo-key",
+    private_key="0x-your-wallet-private-key"
+)
+
+# Start monitoring WETH/USDT pair with a 1.5% minimum profit threshold
+engine.monitor_pair(
+    token_in="WETH",
+    token_out="USDT",
+    min_profit_pct=1.5,
+    gas_limit=150000
+)
 ```
-
-### Configuration Example (`.env`)
-```text
-EXCHANGE=binance
-API_KEY=your_api_key_here
-API_SECRET=your_api_secret_here
-LOG_LEVEL=INFO
-```
-
-## Disclaimer
-This tool is for educational and operational purposes. Crypto trading involves significant risk of loss. Always test your strategies extensively in a sandbox environment before allocating real capital.
 
 ## License
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Distributed under the MIT License. See `LICENSE` for more information.
+This project is licensed under the MIT License. See the `LICENSE` file for details.
