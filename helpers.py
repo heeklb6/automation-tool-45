@@ -1,32 +1,31 @@
 import time
+import functools
 import logging
 from typing import Callable, Any
 
-# Configure logger for automation-tool-45
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger('automation-tool-45')
+logger = logging.getLogger(__name__)
 
-def retry_operation(func: Callable, retries: int = 3, delay: int = 2) -> Any:
-    """Execute function with retry mechanism for transient errors."""
-    for i in range(retries):
-        try:
-            return func()
-        except Exception as e:
-            logger.warning(f"Attempt {i+1} failed: {e}")
-            if i == retries - 1:
-                raise e
-            time.sleep(delay)
+def with_retry(max_attempts: int = 3, delay: float = 1.0):
+    """Decorator to retry network operations on failure."""
+    def decorator(func: Callable):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs) -> Any:
+            last_exception = None
+            for attempt in range(1, max_attempts + 1):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    last_exception = e
+                    logger.warning(f"Attempt {attempt} failed for {func.__name__}: {e}")
+                    if attempt < max_attempts:
+                        time.sleep(delay * attempt)
+            logger.error(f"Function {func.__name__} failed after {max_attempts} attempts")
+            raise last_exception
+        return wrapper
+    return decorator
 
-def format_crypto_amount(amount: float, precision: int = 8) -> str:
-    """Format float to crypto-standard string representation."""
-    return f"{amount:.{precision}f}".rstrip('0').rstrip('.')
-
-def calculate_profit_percentage(initial: float, final: float) -> float:
-    """Calculate return percentage between two values."""
-    if initial == 0:
-        return 0.0
-    return ((final - initial) / initial) * 100
-
-def validate_pair(pair: str) -> bool:
-    """Verify trading pair format e.g. BTCUSDT."""
-    return isinstance(pair, str) and len(pair) >= 6 and pair.isupper()
+@with_retry(max_attempts=3, delay=2.0)
+def fetch_price_data(symbol: str):
+    """Example function for fetching crypto pricing."""
+    # Placeholder for network request logic
+    return {"symbol": symbol, "price": 0.0}
