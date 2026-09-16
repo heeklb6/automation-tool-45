@@ -1,25 +1,27 @@
-class CryptoBaseException(Exception):
-    """Base exception for automation-tool-45 operations."""
+class CryptoAutomationError(Exception):
+    """Base exception for automation-tool-45."""
     pass
 
-class ExchangeConnectionError(CryptoBaseException):
-    """Raised when the crypto exchange API is unreachable."""
+class ExchangeConnectionError(CryptoAutomationError):
+    """Raised when the exchange API is unreachable."""
     pass
 
-class InsufficientFundsError(CryptoBaseException):
-    """Raised when account balance is too low for trades."""
+class InsufficientBalanceError(CryptoAutomationError):
+    """Raised when order execution exceeds wallet funds."""
     pass
 
-class RateLimitExceeded(CryptoBaseException):
-    """Raised when API requests exceed threshold."""
-    def __init__(self, retry_after: int = 60):
-        self.retry_after = retry_after
-        super().__init__(f"Rate limit hit. Wait {retry_after}s.")
+class OrderPlacementError(CryptoAutomationError):
+    """Raised when an order request is rejected by exchange."""
+    def __init__(self, message, code=None):
+        super().__init__(message)
+        self.code = code
 
-class ValidationError(CryptoBaseException):
-    """Raised when payload data is malformed."""
+class DataValidationError(CryptoAutomationError):
+    """Raised when incoming market data is malformed."""
     pass
 
-class OrderExecutionError(CryptoBaseException):
-    """Raised when a trade fails at the exchange."""
-    pass
+def handle_crypto_exception(e: Exception) -> str:
+    """Helper to format exception messages for logging."""
+    if isinstance(e, CryptoAutomationError):
+        return f"[CRITICAL] {type(e).__name__}: {str(e)}"
+    return f"[UNKNOWN_ERROR] {str(e)}"
