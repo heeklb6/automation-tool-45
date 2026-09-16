@@ -1,31 +1,68 @@
-import json
-import time
-from decimal import Decimal
-from typing import Dict, Any, Optional
+import re
+from typing import List, Dict, Any, Tuple
 
-def format_crypto_amount(amount: float, precision: int = 8) -> str:
-    """Converts float to fixed precision string for exchange APIs."""
-    return f"{Decimal(str(amount)):.{precision}f}"
+# Regular expressions for validating common crypto primitives
+TX_HASH_REGEX = re.compile(r"^0x[a-fA-F0-9]{64}$")
+ADDRESS_REGEX = re.compile(r"^0x[a-fA-F0-9]{40}$")
+SUPPORTED_SYMBOLS = {"BTC", "ETH", "USDT", "USDC", "SOL"}
 
-def calculate_profit_margin(buy_price: float, sell_price: float) -> float:
-    """Calculates percentage difference between two price points."""
-    if buy_price <= 0:
-        return 0.0
-    return ((sell_price - buy_price) / buy_price) * 100
+class TransactionProcessor:
+    """Processes and validates cryptocurrency transaction payloads before ingestion."""
 
-def validate_order_payload(data: Dict[str, Any]) -> bool:
-    """Checks if payload contains essential order keys."""
-    required = {'symbol', 'side', 'amount', 'price'}
-    return all(key in data for key in required)
+    def __init__(self):
+        self.processed_count = 0
+        self.failed_count = 0
 
-def log_trade_event(symbol: str, message: str) -> None:
-    """Appends formatted trade event to console output."""
-    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-    print(f"[{timestamp}] TRADE [{symbol.upper()}]: {message}")
+    def validate_payload(self, data: Dict[str, Any]) -> Tuple[bool, str]:
+        """Performs schema and semantic validation on incoming transaction data."""
+        required_keys = {"tx_hash", "recipient", "amount", "symbol"}
+        if not required_keys.issubset(data.keys()):
+            missing = required_keys - data.keys()
+            return False, f"Missing required fields: {', '.join(missing)}"
 
-def safe_json_load(raw_data: str) -> Optional[Dict[str, Any]]:
-    """Safely parses JSON strings with error handling."""
-    try:
-        return json.loads(raw_data)
-    except (json.JSONDecodeError, TypeError):
-        return None
+        if not TX_HASH_REGEX.match(str(data["tx_hash"])):
+            return False, "Invalid transaction hash format"
+
+        if not ADDRESS_REGEX.match(str(data["recipient"])):
+            return False, "Invalid recipient address format"
+
+        try:
+            amount = float(data["amount"])
+            if amount <= 0:
+                return False, "Transaction amount must be strictly positive"
+        except (ValueError, TypeError):
+            return False, "Numeric amount is invalid or unparseable"
+
+        if str(data["symbol"]).upper() not in SUPPORTED_SYMBOLS:
+            return False, f"Unsupported ticker symbol: {data['symbol']}"
+
+        return True, "Valid"
+
+    def process_batch(self, batch: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Executes validation checks in the loop and prepares logs."""
+        results = []
+        for index, raw_item in enumerate(batch):
+            is_valid, reason = self.validate_payload(raw_item)
+            if not is_valid:
+                self.failed_count += 1
+                results.append({
+                    "index": index,
+                    "status": "rejected",
+                    "error": reason
+                })
+                continue
+
+            self.processed_count += 1
+            results.append({
+                "index": index,
+                "status": "approved",
+                "tx_hash": raw_item["tx_hash"],
+                "formatted_amount": f"{float(raw_item['amount']):.6f} {raw_item['symbol'].upper()}"
+            })
+
+        return {
+            "batch_total": len(batch),
+            "successful": self.processed_count,
+            "failed": self.failed_count,
+            "details": results
+        }
