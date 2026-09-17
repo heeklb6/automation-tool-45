@@ -1,38 +1,32 @@
-import os
-from decimal import Decimal
+import math
+from typing import Final, Dict
 
-# Network and exchange endpoints
-API_BASE_URL = "https://api.exchange.com/v3"
-WS_BASE_URL = "wss://ws.exchange.com/v3"
+# Network timeout settings for high-frequency trading
+TIMEOUT_CONNECT: Final[float] = 2.5
+TIMEOUT_READ: Final[float] = 5.0
 
-# Supported trading pairs
-TRADING_PAIRS = {
-    "BTC/USDT": "BTCUSDT",
-    "ETH/USDT": "ETHUSDT",
-    "SOL/USDT": "SOLUSDT"
+# Rate limiting buffer based on exchange constraints
+RATE_LIMIT_BUFFER: Final[int] = 100
+MAX_CONCURRENT_REQUESTS: Final[int] = 50
+
+# Caching performance configurations
+CACHE_TTL_SECONDS: Final[int] = 300
+CACHE_MAX_SIZE: Final[int] = 1024
+
+# Calculation precision for crypto math operations
+DECIMAL_PRECISION: Final[int] = 18
+DEFAULT_SLIPPAGE: Final[float] = 0.005
+
+# Optimized operational status mapping
+STATUS_MAP: Final[Dict[int, str]] = {
+    0: "PENDING",
+    1: "EXECUTING",
+    2: "COMPLETED",
+    3: "FAILED",
+    4: "CANCELLED"
 }
 
-# Decimal precision settings
-PRICE_PRECISION = 8
-AMOUNT_PRECISION = 6
-FEE_RATE = Decimal("0.001")
-
-# Order types
-ORDER_TYPE_LIMIT = "LIMIT"
-ORDER_TYPE_MARKET = "MARKET"
-
-# Timeouts in seconds
-REQUEST_TIMEOUT = 10
-WS_RECONNECT_INTERVAL = 5
-
-# Default log path
-LOG_FILE = "automation-tool-45.log"
-
-# Minimum trade amounts
-MIN_ORDER_VALUE_USDT = Decimal("10.0")
-
-# Supported order statuses
-STATUS_OPEN = "OPEN"
-STATUS_FILLED = "FILLED"
-STATUS_CANCELED = "CANCELED"
-STATUS_REJECTED = "REJECTED"
+def get_performance_thresholds(volatility: float) -> float:
+    """Calculates dynamic threshold for latency mitigation."""
+    base_threshold = 0.05
+    return base_threshold * math.exp(volatility)
