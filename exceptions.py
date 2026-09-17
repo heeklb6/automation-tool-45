@@ -1,27 +1,38 @@
-class CryptoAutomationError(Exception):
+class AutomationError(Exception):
     """Base exception for automation-tool-45."""
     pass
 
-class ExchangeConnectionError(CryptoAutomationError):
-    """Raised when the exchange API is unreachable."""
+class ExchangeConnectionError(AutomationError):
+    """Raised when exchange connectivity fails."""
     pass
 
-class InsufficientBalanceError(CryptoAutomationError):
-    """Raised when order execution exceeds wallet funds."""
+class InsufficientFundsError(AutomationError):
+    """Raised when wallet balance is too low."""
     pass
 
-class OrderPlacementError(CryptoAutomationError):
-    """Raised when an order request is rejected by exchange."""
-    def __init__(self, message, code=None):
-        super().__init__(message)
-        self.code = code
-
-class DataValidationError(CryptoAutomationError):
-    """Raised when incoming market data is malformed."""
+class OrderPlacementError(AutomationError):
+    """Raised when an order fails to execute."""
     pass
 
-def handle_crypto_exception(e: Exception) -> str:
-    """Helper to format exception messages for logging."""
-    if isinstance(e, CryptoAutomationError):
-        return f"[CRITICAL] {type(e).__name__}: {str(e)}"
-    return f"[UNKNOWN_ERROR] {str(e)}"
+class RateLimitExceededError(AutomationError):
+    """Raised when API rate limits are hit."""
+    def __init__(self, retry_after: int = 60):
+        self.retry_after = retry_after
+        super().__init__(f"Rate limit exceeded, retry after {retry_after}s")
+
+class ConfigValidationError(AutomationError):
+    """Raised when configuration values are invalid."""
+    pass
+
+def raise_if_failed(response: dict):
+    """Helper to validate API responses for errors."""
+    if response.get("status") == "error":
+        error_code = response.get("code")
+        message = response.get("message", "Unknown error")
+        
+        if error_code == "INSUFFICIENT_FUNDS":
+            raise InsufficientFundsError(message)
+        elif error_code == "RATE_LIMIT":
+            raise RateLimitExceededError()
+        else:
+            raise AutomationError(message)
