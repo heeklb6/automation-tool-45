@@ -1,35 +1,38 @@
-import time
-import hashlib
-import hmac
-from typing import Dict, Any
+import logging
+from typing import Optional, Any
+from requests.exceptions import RequestException
 
-def generate_signature(api_secret: str, payload: str) -> str:
-    """Generates HMAC-SHA256 signature for API requests."""
-    return hmac.new(
-        api_secret.encode('utf-8'),
-        payload.encode('utf-8'),
-        hashlib.sha256
-    ).hexdigest()
+logger = logging.getLogger(__name__)
 
-def get_timestamp_ms() -> int:
-    """Returns current unix timestamp in milliseconds."""
-    return int(time.time() * 1000)
-
-def format_price(amount: float, precision: int = 8) -> str:
-    """Formats float to crypto-standard string representation."""
-    return f"{amount:.{precision}f}".rstrip('0').rstrip('.')
-
-def sanitize_order_params(params: Dict[str, Any]) -> Dict[str, Any]:
-    """Removes null values and sorts keys for API consistency."""
-    return {k: v for k, v in sorted(params.items()) if v is not None}
-
-def retry_operation(func, retries: int = 3, delay: float = 1.0):
-    """Simple wrapper for network-dependent operations."""
-    for i in range(retries):
-        try:
-            return func()
-        except Exception:
-            if i == retries - 1:
-                raise
-            time.sleep(delay * (2 ** i))
+def safe_api_call(func, *args, **kwargs) -> Optional[Any]:
+    """Executes crypto exchange API calls with robust error handling."""
+    try:
+        return func(*args, **kwargs)
+    except RequestException as e:
+        logger.error(f"Network connectivity issue: {e}")
+    except ValueError as e:
+        logger.error(f"Invalid JSON response or parsing error: {e}")
+    except Exception as e:
+        logger.critical(f"Unexpected error in {func.__name__}: {e}")
     return None
+
+def validate_order_size(amount: float, min_size: float) -> bool:
+    """Ensures order constraints are met before execution."""
+    try:
+        if amount <= 0:
+            raise ValueError("Order amount must be positive")
+        if amount < min_size:
+            logger.warning(f"Amount {amount} below minimum {min_size}")
+            return False
+        return True
+    except (TypeError, ValueError) as e:
+        logger.error(f"Validation failed: {e}")
+        return False
+
+def format_price(price: float, precision: int = 8) -> float:
+    """Normalizes crypto asset price based on ticker precision."""
+    try:
+        return float(format(price, f'.{precision}f'))
+    except (ValueError, TypeError):
+        logger.error("Invalid price format encountered")
+        return 0.0
