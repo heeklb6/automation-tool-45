@@ -1,39 +1,40 @@
-import time
-import logging
-import functools
-from typing import Callable, Any
+import re
+from typing import Any, Dict, Optional, Tuple
 
-# Configure logger for crypto automation tool
-logger = logging.getLogger('automation-tool-45')
 
-def retry_network_operation(retries: int = 3, delay: float = 1.0):
-    """
-    Decorator to implement exponential backoff for network calls
-    """
-    def decorator(func: Callable):
-        @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            last_exception = None
-            current_delay = delay
-            
-            for attempt in range(retries):
-                try:
-                    return func(*args, **kwargs)
-                except (ConnectionError, TimeoutError) as e:
-                    last_exception = e
-                    logger.warning(f"Attempt {attempt + 1} failed: {e}. Retrying...")
-                    time.sleep(current_delay)
-                    current_delay *= 2
-            
-            logger.error("Max retries reached for network operation")
-            raise last_exception
-        return wrapper
-    return decorator
+def is_valid_eth_address(address: str) -> bool:
+    """Check if the provided string is a valid Ethereum wallet address."""
+    if not isinstance(address, str):
+        return False
+    return bool(re.match(r"^0x[a-fA-F0-9]{40}$", address))
 
-@retry_network_operation(retries=3, delay=2.0)
-def fetch_price_data(symbol: str):
-    """
-    Example network operation for crypto price lookup
-    """
-    # Simulate network call logic here
-    pass
+
+def is_valid_btc_address(address: str) -> bool:
+    """Check basic format for Bitcoin Legacy, SegWit, or Bech32 addresses."""
+    if not isinstance(address, str):
+        return False
+    pattern = r"^(1[a-km-zA-HJ-NP-Z1-9]{25,34}|3[a-km-zA-HJ-NP-Z1-9]{25,34}|bc1[a-zA-0-9]{8,87})$"
+    return bool(re.match(pattern, address))
+
+
+def validate_trade_order(order: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
+    """Validate incoming crypto trade order data before execution."""
+    required_fields = ["symbol", "side", "amount", "price"]
+    for field in required_fields:
+        if field not in order:
+            return False, f"Missing required field: {field}"
+
+    if str(order["side"]).upper() not in ["BUY", "SELL"]:
+        return False, "Invalid order side, must be BUY or SELL"
+
+    if not isinstance(order["amount"], (int, float)) or order["amount"] <= 0:
+        return False, "Amount must be a positive number"
+
+    if not isinstance(order["price"], (int, float)) or order["price"] <= 0:
+        return False, "Price must be a positive number"
+
+    symbol_pattern = r"^[A-Z0-9]{2,10}/[A-Z0-9]{2,10}$"
+    if not re.match(symbol_pattern, str(order["symbol"]).upper()):
+        return False, "Invalid symbol format (expected BASE/QUOTE)"
+
+    return True, None
