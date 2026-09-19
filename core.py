@@ -1,53 +1,48 @@
-import bisect
-from typing import List, Tuple
+import asyncio
+from functools import lru_cache
+from typing import Dict, List, Tuple
 
-class OrderBook:
-    """Optimized order book tracker with O(log N) lookup and update operations."""
-    def __init__(self) -> None:
-        # Bid prices stored negated to facilitate descending order sorting with bisect
-        self.bid_prices: List[float] = []
-        self.bid_qtys: List[float] = []
-        # Ask prices stored normally (ascending order)
-        self.ask_prices: List[float] = []
-        self.ask_qtys: List[float] = []
 
-    def update_bid(self, price: float, quantity: float) -> None:
-        """Update or insert bid price level with optimized binary search insertion."""
-        neg_price = -price
-        idx = bisect.bisect_left(self.bid_prices, neg_price)
-        
-        if idx < len(self.bid_prices) and self.bid_prices[idx] == neg_price:
-            if quantity <= 0.0:
-                self.bid_prices.pop(idx)
-                self.bid_qtys.pop(idx)
-            else:
-                self.bid_qtys[idx] = quantity
-        elif quantity > 0.0:
-            self.bid_prices.insert(idx, neg_price)
-            self.bid_qtys.insert(idx, quantity)
+class MarketDataEngine:
+    """Core engine optimized for high-throughput crypto market data processing."""
 
-    def update_ask(self, price: float, quantity: float) -> None:
-        """Update or insert ask price level with optimized binary search insertion."""
-        idx = bisect.bisect_left(self.ask_prices, price)
-        
-        if idx < len(self.ask_prices) and self.ask_prices[idx] == price:
-            if quantity <= 0.0:
-                self.ask_prices.pop(idx)
-                self.ask_qtys.pop(idx)
-            else:
-                self.ask_qtys[idx] = quantity
-        elif quantity > 0.0:
-            self.ask_prices.insert(idx, price)
-            self.ask_qtys.insert(idx, quantity)
+    def __init__(self, cache_size: int = 2048):
+        self.cache_size = cache_size
+        self._ticker_cache: Dict[str, Tuple[float, float]] = {}
+        self._queue: asyncio.Queue = asyncio.Queue()
 
-    def get_depth(self, depth: int) -> Tuple[List[Tuple[float, float]], List[Tuple[float, float]]]:
-        """Retrieve top N depth levels for bids and asks."""
-        bids = [(-self.bid_prices[i], self.bid_qtys[i]) for i in range(min(depth, len(self.bid_prices)))]
-        asks = [(self.ask_prices[i], self.ask_qtys[i]) for i in range(min(depth, len(self.ask_prices)))]
-        return bids, asks
-
-    def get_mid_price(self) -> float:
-        """Retrieve current market mid price."""
-        if not self.bid_prices or not self.ask_prices:
+    @lru_cache(maxsize=2048)
+    def calculate_vwap(self, prices: Tuple[float, ...], volumes: Tuple[float, ...]) -> float:
+        """Calculate Volume-Weighted Average Price with cached execution."""
+        if not prices or len(prices) != len(volumes):
             return 0.0
-        return (-self.bid_prices[0] + self.ask_prices[0]) / 2.0
+
+        total_volume = sum(volumes)
+        if total_volume == 0.0:
+            return 0.0
+
+        weighted_sum = sum(p * v for p, v in zip(prices, volumes))
+        return round(weighted_sum / total_volume, 8)
+
+    async def batch_process_updates(self, updates: List[Dict[str, float]]) -> Dict[str, float]:
+        """Process bulk price updates in vectorized dictionary batches for speed."""
+        aggregated: Dict[str, List[float]] = {}
+
+        for update in updates:
+            symbol = update.get("symbol")
+            price = update.get("price")
+            if symbol and price is not None:
+                if symbol not in aggregated:
+                    aggregated[symbol] = []
+                aggregated[symbol].append(price)
+
+        return {
+            symbol: round(sum(prices) / len(prices), 8)
+            for symbol, prices in aggregated.items()
+            if prices
+        }
+
+    def purge_cache(self) -> None:
+        """Clear LRU cache to prevent stale pricing data accumulation."""
+        self.calculate_vwap.cache_clear()
+        self._ticker_cache.clear()
