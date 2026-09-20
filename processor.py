@@ -1,68 +1,64 @@
-import re
-from typing import List, Dict, Any, Tuple
+"""Crypto transaction and market data processing module."""
 
-# Regular expressions for validating common crypto primitives
-TX_HASH_REGEX = re.compile(r"^0x[a-fA-F0-9]{64}$")
-ADDRESS_REGEX = re.compile(r"^0x[a-fA-F0-9]{40}$")
-SUPPORTED_SYMBOLS = {"BTC", "ETH", "USDT", "USDC", "SOL"}
+from decimal import Decimal
+from typing import Any, Dict, List, Optional
 
-class TransactionProcessor:
-    """Processes and validates cryptocurrency transaction payloads before ingestion."""
 
-    def __init__(self):
-        self.processed_count = 0
-        self.failed_count = 0
+class TradeProcessor:
+    """Processes raw trade data and formats order payloads for exchange execution."""
 
-    def validate_payload(self, data: Dict[str, Any]) -> Tuple[bool, str]:
-        """Performs schema and semantic validation on incoming transaction data."""
-        required_keys = {"tx_hash", "recipient", "amount", "symbol"}
-        if not required_keys.issubset(data.keys()):
-            missing = required_keys - data.keys()
-            return False, f"Missing required fields: {', '.join(missing)}"
+    def __init__(self, default_fee_rate: Decimal = Decimal("0.001")) -> None:
+        self.default_fee_rate = default_fee_rate
 
-        if not TX_HASH_REGEX.match(str(data["tx_hash"])):
-            return False, "Invalid transaction hash format"
+    def calculate_net_amount(
+        self, price: Decimal, quantity: Decimal, is_buy: bool
+    ) -> Decimal:
+        """Calculate total trade amount including network fees.
 
-        if not ADDRESS_REGEX.match(str(data["recipient"])):
-            return False, "Invalid recipient address format"
+        Args:
+            price: Asset execution price.
+            quantity: Trade order size.
+            is_buy: True if buy order, False if sell.
 
-        try:
-            amount = float(data["amount"])
-            if amount <= 0:
-                return False, "Transaction amount must be strictly positive"
-        except (ValueError, TypeError):
-            return False, "Numeric amount is invalid or unparseable"
+        Returns:
+            Net value of trade after fee deduction.
+        """
+        gross_value = price * quantity
+        fee = gross_value * self.default_fee_rate
+        return gross_value + fee if is_buy else gross_value - fee
 
-        if str(data["symbol"]).upper() not in SUPPORTED_SYMBOLS:
-            return False, f"Unsupported ticker symbol: {data['symbol']}"
+    def parse_ticker_data(
+        self, raw_data: Dict[str, Any]
+    ) -> Dict[str, Optional[Decimal]]:
+        """Normalize exchange ticker payload into a structured dictionary.
 
-        return True, "Valid"
+        Args:
+            raw_data: Unstructured ticker JSON response.
 
-    def process_batch(self, batch: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Executes validation checks in the loop and prepares logs."""
-        results = []
-        for index, raw_item in enumerate(batch):
-            is_valid, reason = self.validate_payload(raw_item)
-            if not is_valid:
-                self.failed_count += 1
-                results.append({
-                    "index": index,
-                    "status": "rejected",
-                    "error": reason
-                })
-                continue
+        Returns:
+            Normalized dictionary containing bid, ask, and last prices.
+        """
+        parsed: Dict[str, Optional[Decimal]] = {}
+        for key in ("bid", "ask", "last"):
+            val = raw_data.get(key)
+            parsed[key] = Decimal(str(val)) if val is not None else None
+        return parsed
 
-            self.processed_count += 1
-            results.append({
-                "index": index,
-                "status": "approved",
-                "tx_hash": raw_item["tx_hash"],
-                "formatted_amount": f"{float(raw_item['amount']):.6f} {raw_item['symbol'].upper()}"
-            })
+    def filter_high_volume_pairs(
+        self, pairs: List[Dict[str, Any]], min_volume_usd: Decimal
+    ) -> List[str]:
+        """Filter trading pairs that meet minimum 24h volume criteria.
 
-        return {
-            "batch_total": len(batch),
-            "successful": self.processed_count,
-            "failed": self.failed_count,
-            "details": results
-        }
+        Args:
+            pairs: List of trading pair market details.
+            min_volume_usd: Threshold 24-hour USD volume.
+
+        Returns:
+            List of symbol names meeting the volume threshold.
+        """
+        valid_symbols: List[str] = []
+        for pair in pairs:
+            volume = Decimal(str(pair.get("volume_24h", 0)))
+            if volume >= min_volume_usd and "symbol" in pair:
+                valid_symbols.append(str(pair["symbol"]))
+        return valid_symbols
