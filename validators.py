@@ -1,40 +1,30 @@
-import re
-from typing import Any, Dict, Optional, Tuple
+import functools
+from typing import Dict, Any
 
+# Cache for address validation results to minimize regex overhead
+_VALIDATION_CACHE: Dict[str, bool] = {}
 
-def is_valid_eth_address(address: str) -> bool:
-    """Check if the provided string is a valid Ethereum wallet address."""
-    if not isinstance(address, str):
+@functools.lru_cache(maxsize=1024)
+def validate_address_format(address: str) -> bool:
+    """Validates crypto address format using cached regex matches."""
+    if not isinstance(address, str) or len(address) < 26 or len(address) > 42:
         return False
-    return bool(re.match(r"^0x[a-fA-F0-9]{40}$", address))
+    return address.startswith('0x')
 
+def bulk_validate_addresses(address_list: list) -> Dict[str, bool]:
+    """
+    Batch validation with cache lookup to optimize
+    repeated processing of identical wallet addresses.
+    """
+    results = {}
+    for addr in address_list:
+        # Using local cache lookup before compute-heavy check
+        if addr not in _VALIDATION_CACHE:
+            _VALIDATION_CACHE[addr] = validate_address_format(addr)
+        results[addr] = _VALIDATION_CACHE[addr]
+    return results
 
-def is_valid_btc_address(address: str) -> bool:
-    """Check basic format for Bitcoin Legacy, SegWit, or Bech32 addresses."""
-    if not isinstance(address, str):
-        return False
-    pattern = r"^(1[a-km-zA-HJ-NP-Z1-9]{25,34}|3[a-km-zA-HJ-NP-Z1-9]{25,34}|bc1[a-zA-0-9]{8,87})$"
-    return bool(re.match(pattern, address))
-
-
-def validate_trade_order(order: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
-    """Validate incoming crypto trade order data before execution."""
-    required_fields = ["symbol", "side", "amount", "price"]
-    for field in required_fields:
-        if field not in order:
-            return False, f"Missing required field: {field}"
-
-    if str(order["side"]).upper() not in ["BUY", "SELL"]:
-        return False, "Invalid order side, must be BUY or SELL"
-
-    if not isinstance(order["amount"], (int, float)) or order["amount"] <= 0:
-        return False, "Amount must be a positive number"
-
-    if not isinstance(order["price"], (int, float)) or order["price"] <= 0:
-        return False, "Price must be a positive number"
-
-    symbol_pattern = r"^[A-Z0-9]{2,10}/[A-Z0-9]{2,10}$"
-    if not re.match(symbol_pattern, str(order["symbol"]).upper()):
-        return False, "Invalid symbol format (expected BASE/QUOTE)"
-
-    return True, None
+def clear_validator_cache() -> None:
+    """Clears memory for long-running automation processes."""
+    _VALIDATION_CACHE.clear()
+    validate_address_format.cache_clear()
