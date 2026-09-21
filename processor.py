@@ -1,64 +1,35 @@
-"""Crypto transaction and market data processing module."""
+from typing import List, Dict, Optional
 
-from decimal import Decimal
-from typing import Any, Dict, List, Optional
+class CryptoTransactionProcessor:
+    """Handles batch processing of crypto transaction data."""
 
+    def __init__(self, fee_rate: float = 0.001) -> None:
+        self.fee_rate: float = fee_rate
 
-class TradeProcessor:
-    """Processes raw trade data and formats order payloads for exchange execution."""
+    def calculate_net_amount(self, raw_amount: float) -> float:
+        """Calculates net amount after applying the standard fee."""
+        return raw_amount * (1 - self.fee_rate)
 
-    def __init__(self, default_fee_rate: Decimal = Decimal("0.001")) -> None:
-        self.default_fee_rate = default_fee_rate
+    def process_batch(self, transactions: List[Dict[str, float]]) -> List[float]:
+        """Processes a list of transactions and returns net values."""
+        results: List[float] = []
+        for tx in transactions:
+            amount: Optional[float] = tx.get("amount")
+            if amount is not None and amount > 0:
+                net: float = self.calculate_net_amount(amount)
+                results.append(round(net, 8))
+        return results
 
-    def calculate_net_amount(
-        self, price: Decimal, quantity: Decimal, is_buy: bool
-    ) -> Decimal:
-        """Calculate total trade amount including network fees.
+    def validate_tx_data(self, data: Dict[str, float]) -> bool:
+        """Checks if transaction data contains valid non-negative amounts."""
+        amount = data.get("amount", -1)
+        return isinstance(amount, (int, float)) and amount >= 0
 
-        Args:
-            price: Asset execution price.
-            quantity: Trade order size.
-            is_buy: True if buy order, False if sell.
+def main() -> None:
+    processor = CryptoTransactionProcessor(fee_rate=0.005)
+    sample_data: List[Dict[str, float]] = [{"amount": 1.5}, {"amount": 0.25}]
+    processed: List[float] = processor.process_batch(sample_data)
+    print(f"Processed totals: {processed}")
 
-        Returns:
-            Net value of trade after fee deduction.
-        """
-        gross_value = price * quantity
-        fee = gross_value * self.default_fee_rate
-        return gross_value + fee if is_buy else gross_value - fee
-
-    def parse_ticker_data(
-        self, raw_data: Dict[str, Any]
-    ) -> Dict[str, Optional[Decimal]]:
-        """Normalize exchange ticker payload into a structured dictionary.
-
-        Args:
-            raw_data: Unstructured ticker JSON response.
-
-        Returns:
-            Normalized dictionary containing bid, ask, and last prices.
-        """
-        parsed: Dict[str, Optional[Decimal]] = {}
-        for key in ("bid", "ask", "last"):
-            val = raw_data.get(key)
-            parsed[key] = Decimal(str(val)) if val is not None else None
-        return parsed
-
-    def filter_high_volume_pairs(
-        self, pairs: List[Dict[str, Any]], min_volume_usd: Decimal
-    ) -> List[str]:
-        """Filter trading pairs that meet minimum 24h volume criteria.
-
-        Args:
-            pairs: List of trading pair market details.
-            min_volume_usd: Threshold 24-hour USD volume.
-
-        Returns:
-            List of symbol names meeting the volume threshold.
-        """
-        valid_symbols: List[str] = []
-        for pair in pairs:
-            volume = Decimal(str(pair.get("volume_24h", 0)))
-            if volume >= min_volume_usd and "symbol" in pair:
-                valid_symbols.append(str(pair["symbol"]))
-        return valid_symbols
+if __name__ == "__main__":
+    main()
