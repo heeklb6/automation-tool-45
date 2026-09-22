@@ -1,35 +1,37 @@
-from typing import List, Dict, Optional
+import logging
+from typing import List, Dict, Any
 
-class CryptoTransactionProcessor:
-    """Handles batch processing of crypto transaction data."""
+logger = logging.getLogger(__name__)
 
-    def __init__(self, fee_rate: float = 0.001) -> None:
-        self.fee_rate: float = fee_rate
+class DataProcessor:
+    """Handles normalization and validation of incoming crypto trade data."""
 
-    def calculate_net_amount(self, raw_amount: float) -> float:
-        """Calculates net amount after applying the standard fee."""
-        return raw_amount * (1 - self.fee_rate)
+    def __init__(self, exchange: str):
+        self.exchange = exchange
 
-    def process_batch(self, transactions: List[Dict[str, float]]) -> List[float]:
-        """Processes a list of transactions and returns net values."""
-        results: List[float] = []
-        for tx in transactions:
-            amount: Optional[float] = tx.get("amount")
-            if amount is not None and amount > 0:
-                net: float = self.calculate_net_amount(amount)
-                results.append(round(net, 8))
+    def process_payload(self, data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Filters out invalid trades and normalizes numeric values."""
+        cleaned_data = []
+        for entry in data:
+            try:
+                if not entry.get('price') or not entry.get('amount'):
+                    continue
+                
+                normalized = {
+                    'pair': entry['pair'].upper(),
+                    'price': float(entry['price']),
+                    'amount': float(entry['amount']),
+                    'timestamp': entry.get('timestamp')
+                }
+                cleaned_data.append(normalized)
+            except (ValueError, KeyError, TypeError) as e:
+                logger.warning(f"Skipping invalid trade entry: {e}")
+                continue
+        return cleaned_data
+
+    def batch_process(self, datasets: List[List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
+        """Aggregates multiple trade batches into a single cleaned list."""
+        results = []
+        for batch in datasets:
+            results.extend(self.process_payload(batch))
         return results
-
-    def validate_tx_data(self, data: Dict[str, float]) -> bool:
-        """Checks if transaction data contains valid non-negative amounts."""
-        amount = data.get("amount", -1)
-        return isinstance(amount, (int, float)) and amount >= 0
-
-def main() -> None:
-    processor = CryptoTransactionProcessor(fee_rate=0.005)
-    sample_data: List[Dict[str, float]] = [{"amount": 1.5}, {"amount": 0.25}]
-    processed: List[float] = processor.process_batch(sample_data)
-    print(f"Processed totals: {processed}")
-
-if __name__ == "__main__":
-    main()
