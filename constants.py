@@ -1,32 +1,30 @@
-import math
-from typing import Final, Dict
+from typing import Final, Dict, List
 
-# Network timeout settings for high-frequency trading
-TIMEOUT_CONNECT: Final[float] = 2.5
-TIMEOUT_READ: Final[float] = 5.0
+# Network identifiers for blockchain interaction
+MAINNET_CHAIN_ID: Final[int] = 1
+TESTNET_CHAIN_ID: Final[int] = 11155111
 
-# Rate limiting buffer based on exchange constraints
-RATE_LIMIT_BUFFER: Final[int] = 100
-MAX_CONCURRENT_REQUESTS: Final[int] = 50
+# Trading execution constraints
+MAX_RETRIES: Final[int] = 3
+REQUEST_TIMEOUT: Final[float] = 30.0
 
-# Caching performance configurations
-CACHE_TTL_SECONDS: Final[int] = 300
-CACHE_MAX_SIZE: Final[int] = 1024
+# Supported asset identifiers
+SUPPORTED_TOKENS: Final[List[str]] = ["BTC", "ETH", "SOL"]
 
-# Calculation precision for crypto math operations
-DECIMAL_PRECISION: Final[int] = 18
-DEFAULT_SLIPPAGE: Final[float] = 0.005
+# API threshold settings in milliseconds
+RATE_LIMIT_DELAY: Final[int] = 500
 
-# Optimized operational status mapping
-STATUS_MAP: Final[Dict[int, str]] = {
-    0: "PENDING",
-    1: "EXECUTING",
-    2: "COMPLETED",
-    3: "FAILED",
-    4: "CANCELLED"
+# Mapping for fee calculation tiers
+FEE_TIERS: Final[Dict[str, float]] = {
+    "low": 0.001,
+    "medium": 0.005,
+    "high": 0.01
 }
 
-def get_performance_thresholds(volatility: float) -> float:
-    """Calculates dynamic threshold for latency mitigation."""
-    base_threshold = 0.05
-    return base_threshold * math.exp(volatility)
+def get_chain_name(chain_id: int) -> str:
+    """Return the human-readable name for a given network ID."""
+    mapping: Dict[int, str] = {
+        MAINNET_CHAIN_ID: "mainnet",
+        TESTNET_CHAIN_ID: "sepolia"
+    }
+    return mapping.get(chain_id, "unknown")
