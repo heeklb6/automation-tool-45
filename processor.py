@@ -1,37 +1,36 @@
-import logging
-from typing import List, Dict, Any
+import json
+from decimal import Decimal, ROUND_HALF_UP
+from typing import Dict, List, Optional
 
-logger = logging.getLogger(__name__)
+def normalize_crypto_data(data: Dict) -> Dict:
+    """Standardizes incoming crypto market data formats."""
+    required_fields = ['symbol', 'price', 'volume']
+    
+    # ensure basic data integrity
+    if not all(k in data for k in required_fields):
+        raise ValueError(f"Missing required fields in data: {data}")
 
-class DataProcessor:
-    """Handles normalization and validation of incoming crypto trade data."""
+    try:
+        return {
+            "symbol": str(data['symbol']).upper(),
+            "price": float(Decimal(str(data['price'])).quantize(Decimal('0.00000001')),
+            "volume": float(Decimal(str(data['volume'])).quantize(Decimal('0.00000001'))),
+            "timestamp": data.get('timestamp')
+        }
+    except (ValueError, TypeError) as e:
+        raise ValueError(f"Data transformation error: {e}")
 
-    def __init__(self, exchange: str):
-        self.exchange = exchange
+def batch_process_prices(items: List[Dict]) -> List[Dict]:
+    """Processes list of raw tick data for storage."""
+    processed = []
+    for item in items:
+        try:
+            processed.append(normalize_crypto_data(item))
+        except ValueError:
+            continue
+    return processed
 
-    def process_payload(self, data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Filters out invalid trades and normalizes numeric values."""
-        cleaned_data = []
-        for entry in data:
-            try:
-                if not entry.get('price') or not entry.get('amount'):
-                    continue
-                
-                normalized = {
-                    'pair': entry['pair'].upper(),
-                    'price': float(entry['price']),
-                    'amount': float(entry['amount']),
-                    'timestamp': entry.get('timestamp')
-                }
-                cleaned_data.append(normalized)
-            except (ValueError, KeyError, TypeError) as e:
-                logger.warning(f"Skipping invalid trade entry: {e}")
-                continue
-        return cleaned_data
-
-    def batch_process(self, datasets: List[List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
-        """Aggregates multiple trade batches into a single cleaned list."""
-        results = []
-        for batch in datasets:
-            results.extend(self.process_payload(batch))
-        return results
+def calculate_value(price: float, amount: float) -> str:
+    """Precise calculation of position value in USD."""
+    val = Decimal(str(price)) * Decimal(str(amount))
+    return str(val.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))
