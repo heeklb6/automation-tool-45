@@ -1,36 +1,31 @@
-import time
-import functools
-import logging
-from typing import Callable, Any
-
-# Configure logger for automation-tool-45 network operations
-logger = logging.getLogger('automation-tool-45')
-
-class NetworkError(Exception):
-    """Custom exception for crypto API connectivity issues."""
+class AutomationError(Exception):
+    """Base exception for automation-tool-45."""
     pass
 
-def retry_on_failure(max_attempts: int = 3, delay: float = 1.0):
-    """
-    Decorator for retrying network operations with exponential backoff.
-    
-    Args:
-        max_attempts: Total number of attempts including initial try
-        delay: Base sleep duration between retries in seconds
-    """
-    def decorator(func: Callable):
-        @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            last_exception = None
-            for attempt in range(max_attempts):
-                try:
-                    return func(*args, **kwargs)
-                except (ConnectionError, TimeoutError) as e:
-                    last_exception = e
-                    logger.warning(f"Attempt {attempt + 1} failed: {e}. Retrying...")
-                    time.sleep(delay * (2 ** attempt))
-            
-            logger.error(f"Final attempt failed after {max_attempts} retries.")
-            raise NetworkError(f"Failed after {max_attempts} attempts: {last_exception}")
-        return wrapper
-    return decorator
+class NetworkTimeoutError(AutomationError):
+    """Raised when external crypto exchange APIs timeout."""
+    pass
+
+class InsufficientFundsError(AutomationError):
+    """Raised when account balance is too low for trade."""
+    pass
+
+class RateLimitExceededError(AutomationError):
+    """Raised when API request frequency limits are hit."""
+    pass
+
+class ConfigurationError(AutomationError):
+    """Raised for invalid environment or config settings."""
+    pass
+
+def handle_exception(e: Exception) -> str:
+    """Format exception message for logging system."""
+    if isinstance(e, AutomationError):
+        return f"[AUTOMATION_ERROR] {type(e).__name__}: {str(e)}"
+    return f"[UNHANDLED_ERROR] {type(e).__name__}: {str(e)}"
+
+if __name__ == "__main__":
+    try:
+        raise InsufficientFundsError("Wallet balance below order threshold")
+    except AutomationError as err:
+        print(handle_exception(err))
