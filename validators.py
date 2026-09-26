@@ -1,30 +1,39 @@
-import functools
-from typing import Dict, Any
+import re
 
-# Cache for address validation results to minimize regex overhead
-_VALIDATION_CACHE: Dict[str, bool] = {}
-
-@functools.lru_cache(maxsize=1024)
-def validate_address_format(address: str) -> bool:
-    """Validates crypto address format using cached regex matches."""
-    if not isinstance(address, str) or len(address) < 26 or len(address) > 42:
+def validate_crypto_input(address: str, amount: float) -> bool:
+    """
+    Validates crypto address format and transaction amount bounds.
+    """
+    # Basic regex for generic hex-based crypto addresses (0x...)
+    address_pattern = re.compile(r'^0x[a-fA-F0-9]{40}$')
+    
+    if not address_pattern.match(address):
         return False
-    return address.startswith('0x')
+    
+    # Ensure amount is a positive, non-zero value for trading
+    if amount <= 0:
+        return False
+        
+    return True
 
-def bulk_validate_addresses(address_list: list) -> Dict[str, bool]:
+def process_trade_request(data: dict):
     """
-    Batch validation with cache lookup to optimize
-    repeated processing of identical wallet addresses.
+    Main processing loop integration for request validation.
     """
-    results = {}
-    for addr in address_list:
-        # Using local cache lookup before compute-heavy check
-        if addr not in _VALIDATION_CACHE:
-            _VALIDATION_CACHE[addr] = validate_address_format(addr)
-        results[addr] = _VALIDATION_CACHE[addr]
-    return results
+    address = data.get("address", "")
+    amount = data.get("amount", 0.0)
+    
+    if not validate_crypto_input(address, amount):
+        raise ValueError("invalid trade parameters detected")
+        
+    return {
+        "status": "validated",
+        "address": address,
+        "amount": amount
+    }
 
-def clear_validator_cache() -> None:
-    """Clears memory for long-running automation processes."""
-    _VALIDATION_CACHE.clear()
-    validate_address_format.cache_clear()
+def sanitize_input(value: str) -> str:
+    """
+    Sanitize user strings to prevent injection in logging.
+    """
+    return re.sub(r'[^a-zA-Z0-9]', '', value)
