@@ -1,35 +1,38 @@
 import logging
-from typing import Dict, Any
-from core import CryptoEngine
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
-class TradeHandler:
-    def __init__(self, engine: CryptoEngine):
-        self.engine = engine
-        self.active_tasks = {}
+class CryptoTransactionHandler:
+    """Handles execution of crypto trades with robust error checks."""
+    
+    def __init__(self, exchange_client: Any):
+        self.client = exchange_client
 
-    def handle_signal(self, payload: Dict[str, Any]) -> bool:
-        """Process incoming trading signals from webhook."""
-        symbol = payload.get("symbol")
-        side = payload.get("side")
-        
-        if not symbol or side not in ["buy", "sell"]:
-            logger.error(f"invalid signal structure: {payload}")
-            return False
+    def execute_trade(self, symbol: str, amount: float, price: float) -> Optional[Dict[str, Any]]:
+        """Executes a trade with validation for edge cases."""
+        if amount <= 0 or price <= 0:
+            logger.error(f"Invalid order parameters: {amount}@{price}")
+            return None
 
         try:
-            order_id = self.engine.execute(symbol, side, payload.get("amount", 0))
-            self.active_tasks[order_id] = payload
-            logger.info(f"order {order_id} processed for {symbol}")
-            return True
+            response = self.client.create_order(symbol=symbol, side='buy', type='limit', amount=amount, price=price)
+            return response
+        except ConnectionError:
+            logger.warning("Network instability detected during trade execution")
+            return None
+        except ValueError as ve:
+            logger.error(f"Malformed API response data: {ve}")
+            return None
         except Exception as e:
-            logger.exception(f"execution failure for {symbol}: {e}")
-            return False
+            logger.critical(f"Unexpected system failure in transaction handler: {e}")
+            return None
 
-    def cleanup_stale_orders(self):
-        """Prune local cache of completed operations."""
-        keys_to_remove = [k for k, v in self.active_tasks.items() if v.get("status") == "closed"]
-        for k in keys_to_remove:
-            del self.active_tasks[k]
-        logger.debug(f"cleanup completed, {len(keys_to_remove)} tasks removed")
+    def validate_balance(self, asset: str, required_amount: float) -> bool:
+        """Checks if account balance meets minimum requirements."""
+        try:
+            balance = self.client.fetch_balance(asset)
+            return balance >= required_amount
+        except (AttributeError, KeyError) as e:
+            logger.error(f"Balance check failed due to data structure mismatch: {e}")
+            return False
