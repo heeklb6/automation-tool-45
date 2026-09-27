@@ -1,57 +1,48 @@
-"""Crypto trade payload processor module for order execution."""
+import logging
+from typing import Any, Dict, List, Optional
 
-from typing import Dict, List, Any
-from decimal import Decimal
+logger = logging.getLogger(__name__)
 
 
-class TradeProcessor:
-    """Processes raw market data and formats orders for execution."""
+class TransactionProcessor:
+    """Processes and normalizes raw cryptocurrency exchange trade payloads."""
 
-    def __init__(self, fee_rate: float = 0.001) -> None:
-        """Initialize processor with default trading fee rate."""
-        self.fee_rate: Decimal = Decimal(str(fee_rate))
+    def __init__(self, supported_symbols: List[str]):
+        self.supported_symbols = [s.upper() for s in supported_symbols]
 
-    def calculate_net_amount(self, amount: float, price: float) -> Decimal:
-        """Calculate net trade cost including configured exchange fees.
+    def normalize_trade(self, raw_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Extracts and formats trade metrics from raw exchange data."""
+        try:
+            symbol = str(raw_data.get("symbol", "")).upper()
+            if symbol not in self.supported_symbols:
+                logger.warning("Unsupported trading pair encountered: %s", symbol)
+                return None
 
-        Args:
-            amount: Quantity of cryptocurrency being traded.
-            price: Unit execution price in quote currency.
+            price = float(raw_data.get("price", 0.0))
+            amount = float(raw_data.get("amount", 0.0))
+            side = str(raw_data.get("side", "")).lower()
 
-        Returns:
-            Total gross cost plus exchange fee as Decimal.
-        """
-        qty = Decimal(str(amount))
-        unit_price = Decimal(str(price))
-        gross = qty * unit_price
-        fee = gross * self.fee_rate
-        return gross + fee
+            if price <= 0 or amount <= 0 or side not in ("buy", "sell"):
+                logger.error("Invalid trade payload metrics: %s", raw_data)
+                return None
 
-    def filter_valid_trades(
-        self, trades: List[Dict[str, Any]], min_volume: float
-    ) -> List[Dict[str, Any]]:
-        """Filter trade payloads that meet minimum volume criteria.
+            return {
+                "symbol": symbol,
+                "price": price,
+                "amount": amount,
+                "total": round(price * amount, 8),
+                "side": side,
+                "timestamp": raw_data.get("timestamp"),
+            }
+        except (ValueError, TypeError) as err:
+            logger.error("Failed to normalize trade payload: %s", err)
+            return None
 
-        Args:
-            trades: List of raw trade data dictionaries from ticker stream.
-            min_volume: Minimum threshold volume in quote currency.
-
-        Returns:
-            Filtered list of structured trade event objects.
-        """
-        valid_trades: List[Dict[str, Any]] = []
-        min_vol_dec = Decimal(str(min_volume))
-
-        for trade in trades:
-            price = Decimal(str(trade.get("price", 0)))
-            size = Decimal(str(trade.get("size", 0)))
-            volume = price * size
-
-            if volume >= min_vol_dec:
-                valid_trades.append({
-                    "symbol": str(trade.get("symbol", "")),
-                    "volume": float(volume),
-                    "side": str(trade.get("side", "buy")).upper(),
-                })
-
+    def batch_process(self, records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Filters and normalizes a batch of trade records."""
+        valid_trades = []
+        for record in records:
+            processed = self.normalize_trade(record)
+            if processed:
+                valid_trades.append(processed)
         return valid_trades
