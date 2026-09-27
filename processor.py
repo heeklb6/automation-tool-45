@@ -1,48 +1,53 @@
-import logging
-from typing import Any, Dict, List, Optional
+"""Market data and transaction payload processor for crypto trading pipeline."""
 
-logger = logging.getLogger(__name__)
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import Dict, List, Optional
 
 
-class TransactionProcessor:
-    """Processes and normalizes raw cryptocurrency exchange trade payloads."""
+@dataclass
+class TradeSignal:
+    symbol: str
+    action: str
+    price: float
+    quantity: float
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
-    def __init__(self, supported_symbols: List[str]):
-        self.supported_symbols = [s.upper() for s in supported_symbols]
 
-    def normalize_trade(self, raw_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Extracts and formats trade metrics from raw exchange data."""
-        try:
-            symbol = str(raw_data.get("symbol", "")).upper()
-            if symbol not in self.supported_symbols:
-                logger.warning("Unsupported trading pair encountered: %s", symbol)
-                return None
+class OrderProcessor:
+    """Processes raw exchange payloads into normalized trading signals."""
 
-            price = float(raw_data.get("price", 0.0))
-            amount = float(raw_data.get("amount", 0.0))
-            side = str(raw_data.get("side", "")).lower()
+    def __init__(self, min_order_value: float = 10.0):
+        self.min_order_value = min_order_value
+        self.processed_count = 0
 
-            if price <= 0 or amount <= 0 or side not in ("buy", "sell"):
-                logger.error("Invalid trade payload metrics: %s", raw_data)
-                return None
+    def parse_payload(self, raw_data: Dict) -> Optional[TradeSignal]:
+        """Validates and parses raw websocket or REST trade payload."""
+        symbol = raw_data.get("symbol")
+        side = raw_data.get("side", "").upper()
+        price = float(raw_data.get("price", 0.0))
+        qty = float(raw_data.get("quantity", 0.0))
 
-            return {
-                "symbol": symbol,
-                "price": price,
-                "amount": amount,
-                "total": round(price * amount, 8),
-                "side": side,
-                "timestamp": raw_data.get("timestamp"),
-            }
-        except (ValueError, TypeError) as err:
-            logger.error("Failed to normalize trade payload: %s", err)
+        if not symbol or side not in ("BUY", "SELL"):
             return None
 
-    def batch_process(self, records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Filters and normalizes a batch of trade records."""
-        valid_trades = []
-        for record in records:
-            processed = self.normalize_trade(record)
-            if processed:
-                valid_trades.append(processed)
-        return valid_trades
+        total_value = price * qty
+        if total_value < self.min_order_value:
+            return None
+
+        return TradeSignal(
+            symbol=symbol,
+            action=side,
+            price=price,
+            quantity=qty,
+        )
+
+    def process_batch(self, payloads: List[Dict]) -> List[TradeSignal]:
+        """Filters and reorganizes a list of incoming market payloads."""
+        signals = []
+        for payload in payloads:
+            signal = self.parse_payload(payload)
+            if signal:
+                signals.append(signal)
+                self.processed_count += 1
+        return signals
