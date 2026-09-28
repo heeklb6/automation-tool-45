@@ -1,29 +1,52 @@
-import decimal
-from typing import Dict, Union
+import logging
+import re
+from typing import Any, Dict, List
 
-def normalize_crypto_amount(amount: Union[str, float, int], precision: int = 8) -> decimal.Decimal:
-    """Converts crypto amount strings to precise decimal objects."""
-    context = decimal.Context(prec=precision, rounding=decimal.ROUND_HALF_UP)
-    return context.create_decimal(str(amount))
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-def format_order_payload(symbol: str, side: str, price: float, quantity: float) -> Dict:
-    """Constructs standard dictionary payload for exchange APIs."""
-    return {
-        "symbol": symbol.upper(),
-        "side": side.lower(),
-        "type": "limit",
-        "price": str(price),
-        "quantity": str(quantity),
-        "timestamp": None
-    }
+ETH_ADDRESS_PATTERN = re.compile(r"^0x[a-fA-F0-9]{40}$")
+SUPPORTED_SYMBOLS = {"BTC", "ETH", "USDT", "USDC", "SOL"}
 
-def calculate_position_size(balance: float, risk_percentage: float, stop_loss_pct: float) -> float:
-    """Calculates trade size based on account risk management."""
-    if not (0 < risk_percentage <= 100) or stop_loss_pct <= 0:
-        return 0.0
-    risk_amount = balance * (risk_percentage / 100)
-    return risk_amount / (stop_loss_pct / 100)
 
-def sanitize_symbol(symbol: str) -> str:
-    """Standardizes trading pair formats by removing separators."""
-    return symbol.replace('/', '').replace('_', '').upper()
+def validate_transaction_input(payload: Dict[str, Any]) -> bool:
+    """Validate incoming crypto transaction payload before execution."""
+    if not isinstance(payload, dict):
+        logging.warning("Invalid payload format: expected dict")
+        return False
+
+    address = payload.get("recipient")
+    amount = payload.get("amount")
+    symbol = payload.get("symbol")
+
+    if not address or not isinstance(address, str) or not ETH_ADDRESS_PATTERN.match(address):
+        logging.warning(f"Invalid recipient address: {address}")
+        return False
+
+    if not isinstance(amount, (int, float)) or amount <= 0:
+        logging.warning(f"Invalid transaction amount: {amount}")
+        return False
+
+    if not symbol or not isinstance(symbol, str) or symbol.upper() not in SUPPORTED_SYMBOLS:
+        logging.warning(f"Unsupported crypto symbol: {symbol}")
+        return False
+
+    return True
+
+
+def process_transaction_queue(queue: List[Dict[str, Any]]) -> Dict[str, int]:
+    """Process batch of transactions with input validation in main loop."""
+    stats = {"processed": 0, "skipped": 0}
+
+    for idx, item in enumerate(queue):
+        logging.info(f"Processing item #{idx + 1}")
+        
+        if not validate_transaction_input(item):
+            logging.error(f"Skipping invalid item #{idx + 1}")
+            stats["skipped"] += 1
+            continue
+
+        symbol = item["symbol"].upper()
+        logging.info(f"Successfully dispatched {item['amount']} {symbol} to {item['recipient']}")
+        stats["processed"] += 1
+
+    return stats
