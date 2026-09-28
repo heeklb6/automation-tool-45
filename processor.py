@@ -1,53 +1,60 @@
-"""Market data and transaction payload processor for crypto trading pipeline."""
+import time
+import logging
+import functools
+import urllib.error
+import urllib.request
+import json
+from typing import Callable, Any, Optional
 
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Dict, List, Optional
+logger = logging.getLogger(__name__)
+
+def retry_network_op(
+    max_retries: int = 3,
+    backoff_factor: float = 1.5,
+    exceptions: tuple = (urllib.error.URLError, TimeoutError, ConnectionError)
+):
+    """
+    Decorator for retrying network operations with exponential backoff.
+    Designed for crypto API endpoints prone to transient connection errors.
+    """
+    def decorator(func: Callable) -> Callable:
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            retries = 0
+            delay = 1.0
+
+            while True:
+                try:
+                    return func(*args, **kwargs)
+                except exceptions as err:
+                    retries += 1
+                    if retries > max_retries:
+                        logger.error(f"Failed '{func.__name__}' after {max_retries} retries: {err}")
+                        raise
+                    
+                    sleep_time = delay * (backoff_factor ** (retries - 1))
+                    logger.warning(
+                        f"Network error in '{func.__name__}': {err}. Retrying in {sleep_time:.2f}s ({retries}/{max_retries})"
+                    )
+                    time.sleep(sleep_time)
+
+        return wrapper
+    return decorator
 
 
-@dataclass
-class TradeSignal:
-    symbol: str
-    action: str
-    price: float
-    quantity: float
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+def fetch_crypto_price(symbol: str = "BTCUSDT") -> Optional[dict]:
+    """
+    Fetch current ticker price from public crypto API with retries.
+    """
+    @retry_network_op(max_retries=3, backoff_factor=2.0)
+    def _api_request() -> dict:
+        url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}"
+        req = urllib.request.Request(url, headers={"User-Agent": "automation-tool-45/1.0"})
+        with urllib.request.urlopen(req, timeout=5) as response:
+            return json.loads(response.read().decode("utf-8"))
 
-
-class OrderProcessor:
-    """Processes raw exchange payloads into normalized trading signals."""
-
-    def __init__(self, min_order_value: float = 10.0):
-        self.min_order_value = min_order_value
-        self.processed_count = 0
-
-    def parse_payload(self, raw_data: Dict) -> Optional[TradeSignal]:
-        """Validates and parses raw websocket or REST trade payload."""
-        symbol = raw_data.get("symbol")
-        side = raw_data.get("side", "").upper()
-        price = float(raw_data.get("price", 0.0))
-        qty = float(raw_data.get("quantity", 0.0))
-
-        if not symbol or side not in ("BUY", "SELL"):
-            return None
-
-        total_value = price * qty
-        if total_value < self.min_order_value:
-            return None
-
-        return TradeSignal(
-            symbol=symbol,
-            action=side,
-            price=price,
-            quantity=qty,
-        )
-
-    def process_batch(self, payloads: List[Dict]) -> List[TradeSignal]:
-        """Filters and reorganizes a list of incoming market payloads."""
-        signals = []
-        for payload in payloads:
-            signal = self.parse_payload(payload)
-            if signal:
-                signals.append(signal)
-                self.processed_count += 1
-        return signals
+    try:
+        return _api_request()
+    except Exception as err:
+        logger.error(f"Could not fetch price for {symbol}: {err}")
+        return None
