@@ -2,38 +2,31 @@ import logging
 from logging.handlers import RotatingFileHandler
 import os
 
-def setup_logger(name: str = 'crypto_bot', log_file: str = 'automation.log'):
+def setup_logger(name: str = "automation_tool_45", log_file: str = "app.log") -> logging.Logger:
     """
-    Configures a rotating file logger for crypto automation tool.
+    Configures a rotating file logger for crypto automation operations.
     """
     logger = logging.getLogger(name)
     logger.setLevel(logging.INFO)
 
-    # Prevent duplicate handlers if re-initialized
-    if logger.handlers:
-        return logger
+    # Prevent duplicate handlers if setup is called multiple times
+    if not logger.handlers:
+        # 5MB per file, keep 3 backup files
+        handler = RotatingFileHandler(
+            log_file,
+            maxBytes=5 * 1024 * 1024,
+            backupCount=3
+        )
+        
+        formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
 
-    # Define log format
-    formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
-
-    # File rotation: 5MB per file, keep 5 backups
-    file_handler = RotatingFileHandler(
-        log_file, 
-        maxBytes=5*1024*1024, 
-        backupCount=5
-    )
-    file_handler.setFormatter(formatter)
-
-    # Console output handler
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(formatter)
-
-    logger.addHandler(file_handler)
-    logger.addHandler(console_handler)
+        # Also output to console for development visibility
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
 
     return logger
-
-# Instantiate default logger for the module
-logger = setup_logger()
