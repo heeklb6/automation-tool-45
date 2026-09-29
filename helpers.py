@@ -1,32 +1,32 @@
 import time
-import decimal
-from typing import Union
+import logging
+from typing import Callable, Any, Optional
 
-def format_amount(amount: Union[float, str, decimal.Decimal], precision: int = 8) -> str:
-    """Standardizes crypto values to specified decimal precision."""
-    val = decimal.Decimal(str(amount))
-    return format(val.quantize(decimal.Decimal(f'1.{"0" * precision}')), 'f')
+logger = logging.getLogger(__name__)
 
-def get_unix_timestamp() -> int:
-    """Current server-side epoch time in seconds."""
-    return int(time.time())
-
-def calculate_fee(amount: float, rate: float) -> float:
-    """Multiplicative fee calculation for trade orders."""
-    return float(amount) * rate
-
-def validate_ticker(ticker: str) -> bool:
-    """Ensures ticker format complies with standard pairs."""
-    if not isinstance(ticker, str) or '_' not in ticker:
-        return False
-    return ticker.isupper()
-
-def retry_operation(func, max_attempts: int = 3, delay: float = 1.0):
-    """Basic exponential backoff wrapper for API calls."""
-    for i in range(max_attempts):
+def retry_operation(func: Callable, retries: int = 3, delay: float = 1.0) -> Any:
+    """Execute function with simple exponential backoff."""
+    last_exception = None
+    for attempt in range(retries):
         try:
             return func()
-        except Exception:
-            if i == max_attempts - 1:
-                raise
-            time.sleep(delay * (2 ** i))
+        except Exception as e:
+            last_exception = e
+            logger.warning(f"Attempt {attempt + 1} failed: {e}")
+            time.sleep(delay * (2 ** attempt))
+    raise last_exception
+
+def format_crypto_amount(amount: float, precision: int = 8) -> str:
+    """Normalize float values to string for API payloads."""
+    return f"{amount:.{precision}f}".rstrip('0').rstrip('.')
+
+def validate_ticker(ticker: str) -> bool:
+    """Check if ticker string meets standard exchange format."""
+    if not ticker or '_' not in ticker:
+        return False
+    base, quote = ticker.split('_')
+    return base.isalnum() and quote.isalnum()
+
+def get_timestamp_ms() -> int:
+    """Current unix epoch in milliseconds for exchange APIs."""
+    return int(time.time() * 1000)
