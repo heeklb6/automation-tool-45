@@ -1,39 +1,29 @@
 import re
 
-def validate_crypto_input(address: str, amount: float) -> bool:
-    """
-    Validates crypto address format and transaction amount bounds.
-    """
-    # Basic regex for generic hex-based crypto addresses (0x...)
-    address_pattern = re.compile(r'^0x[a-fA-F0-9]{40}$')
-    
-    if not address_pattern.match(address):
-        return False
-    
-    # Ensure amount is a positive, non-zero value for trading
-    if amount <= 0:
-        return False
-        
-    return True
+# crypto-specific validation patterns
+ADDRESS_PATTERN = re.compile(r'^0x[a-fA-F0-9]{40}$')
+TX_HASH_PATTERN = re.compile(r'^0x[a-fA-F0-9]{64}$')
 
-def process_trade_request(data: dict):
-    """
-    Main processing loop integration for request validation.
-    """
-    address = data.get("address", "")
-    amount = data.get("amount", 0.0)
-    
-    if not validate_crypto_input(address, amount):
-        raise ValueError("invalid trade parameters detected")
-        
-    return {
-        "status": "validated",
-        "address": address,
-        "amount": amount
-    }
+def validate_eth_address(address: str) -> bool:
+    """verify ethereum address format"""
+    return bool(ADDRESS_PATTERN.match(address))
 
-def sanitize_input(value: str) -> str:
-    """
-    Sanitize user strings to prevent injection in logging.
-    """
-    return re.sub(r'[^a-zA-Z0-9]', '', value)
+def validate_tx_hash(tx_hash: str) -> bool:
+    """verify transaction hash format"""
+    return bool(TX_HASH_PATTERN.match(tx_hash))
+
+def validate_amount(amount: str) -> bool:
+    """verify numeric string precision for crypto balances"""
+    try:
+        value = float(amount)
+        return value >= 0
+    except ValueError:
+        return False
+
+def sanitize_input(data: str) -> str:
+    """remove non-alphanumeric noise from inputs"""
+    return re.sub(r'[^a-zA-Z0-9]', '', data)
+
+def check_gas_limit(limit: int) -> bool:
+    """bounds check for network gas limits"""
+    return 21000 <= limit <= 10000000
