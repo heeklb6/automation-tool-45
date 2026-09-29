@@ -1,49 +1,44 @@
 # automation-tool-45
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
-`automation-tool-45` is a high-performance Python engine designed to automate multi-DEX arbitrage execution and real-time liquidity pool monitoring across EVM-compatible networks. It empowers algorithmic traders to detect price discrepancies on-chain and execute flash-swaps with sub-second latency.
+`automation-tool-45` is a high-performance Python framework designed to automate trade execution and portfolio rebalancing across multiple decentralized exchanges. It leverages asynchronous processing to minimize latency, ensuring optimal order routing in volatile crypto markets.
 
 ## Features
-
-* **Multi-DEX Smart Routing:** Instantly scans and compares token spreads across Uniswap v3, SushiSwap, and PancakeSwap.
-* **Gas-Optimized Execution:** Employs dynamic gas-pricing strategies and private transaction RPCs (like Flashbots) to eliminate front-running and reduce revert fees.
-* **Mempool Monitoring:** Listens to pending liquidity events via WebSockets to identify profitable arbitrage paths before they are mined.
+*   **Multi-DEX Aggregator:** Seamlessly interacts with Uniswap V3, PancakeSwap, and SushiSwap via unified APIs.
+*   **Asynchronous Execution:** Utilizes `asyncio` and `aiohttp` to manage concurrent order requests with sub-millisecond precision.
+*   **Risk Management Engine:** Configurable circuit breakers that halt trading automatically based on user-defined drawdown thresholds.
+*   **Encrypted Key Storage:** Implements Fernet symmetric encryption to secure private keys locally, preventing exposure in configuration files.
 
 ## Installation
 
-Clone the repository and install the required dependencies:
+Ensure you have Python 3.10+ installed. Clone the repository and install the required dependencies:
 
 ```bash
 git clone https://github.com/Developer/automation-tool-45.git
 cd automation-tool-45
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-*Note: Requires Python 3.9+ and an active Web3 provider URL.*
+## Basic Usage
 
-## Quick Start
+1. **Configure Environment:** Create a `.env` file and populate your node provider URL and encrypted credentials:
+   ```bash
+   cp .env.example .env
+   # Edit .env with your RPC URL and API keys
+   ```
 
-Initialize the tracker and begin scanning for arbitrage opportunities between WETH and USDT:
+2. **Run Strategy:** Execute a basic market-making strategy:
+   ```bash
+   python main.py --strategy mm_base --pair ETH/USDT --amount 1.5
+   ```
 
-```python
-from automation_tool import ArbitrageEngine
-
-# Initialize engine with your RPC node
-engine = ArbitrageEngine(
-    rpc_url="https://eth-mainnet.g.alchemy.com/v2/demo-key",
-    private_key="0x-your-wallet-private-key"
-)
-
-# Start monitoring WETH/USDT pair with a 1.5% minimum profit threshold
-engine.monitor_pair(
-    token_in="WETH",
-    token_out="USDT",
-    min_profit_pct=1.5,
-    gas_limit=150000
-)
-```
+3. **Monitor:** Real-time trade logs will be generated in `logs/trading.log`.
 
 ## License
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-This project is licensed under the MIT License. See the `LICENSE` file for details.
+Distributed under the MIT License. See `LICENSE` for more information.
+
+---
+*Disclaimer: This tool is for educational and experimental purposes. Always test strategies on testnets before deploying capital to mainnet environments.*
