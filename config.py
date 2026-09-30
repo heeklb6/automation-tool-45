@@ -1,54 +1,38 @@
-import json
 import os
-from pathlib import Path
+import json
 from typing import Any, Dict
 
-DEFAULT_CONFIG: Dict[str, Any] = {
-    "rpc_url": "https://eth-mainnet.g.alchemy.com/v2/demo",
-    "exchange": "binance",
-    "trading_pair": "BTC/USDT",
-    "max_slippage_pct": 0.5,
-    "gas_limit": 21000,
-    "request_timeout_sec": 10,
-    "enable_paper_trading": True,
-    "max_position_size_usd": 1000.0,
+DEFAULT_CONFIG = {
+    "rpc_url": "https://mainnet.infura.io/v3/",
+    "max_retries": 3,
+    "timeout": 30,
+    "dry_run": True
 }
 
-
-def load_config(filepath: str = "config.json") -> Dict[str, Any]:
-    """Loads configuration from a JSON file, merging with default values.
-
-    Environment variables override loaded settings if present.
-    """
+def load_config(config_path: str = "config.json") -> Dict[str, Any]:
+    """Loads configuration from disk or returns defaults."""
     config = DEFAULT_CONFIG.copy()
-    config_path = Path(filepath)
-
-    if config_path.is_file():
+    
+    if os.path.exists(config_path):
         try:
-            with open(config_path, "r", encoding="utf-8") as f:
+            with open(config_path, "r") as f:
                 user_config = json.load(f)
                 config.update(user_config)
-        except (json.JSONDecodeError, IOError) as err:
-            print(f"Warning: Failed to parse {filepath}, using defaults. Error: {err}")
+        except (json.JSONDecodeError, IOError) as e:
+            print(f"Warning: Could not read config file: {e}. Using defaults.")
+            
+    return config
 
-    # Override settings from environment variables if set
-    env_mappings = {
-        "CRYPTO_RPC_URL": "rpc_url",
-        "EXCHANGE_NAME": "exchange",
-        "TRADING_PAIR": "trading_pair",
-        "PAPER_TRADING": "enable_paper_trading",
-    }
-
-    for env_var, config_key in env_mappings.items():
-        if env_var in os.environ:
-            val = os.environ[env_var]
-            if isinstance(config[config_key], bool):
-                config[config_key] = val.lower() in ("true", "1", "yes")
-            elif isinstance(config[config_key], float):
-                config[config_key] = float(val)
-            elif isinstance(config[config_key], int):
-                config[config_key] = int(val)
+def get_env_overrides(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Overrides config values with environment variables."""
+    for key in config:
+        env_val = os.getenv(f"AUTO_{key.upper()}")
+        if env_val is not None:
+            # Handle type casting for environment variables
+            if isinstance(config[key], bool):
+                config[key] = env_val.lower() in ("true", "1", "yes")
+            elif isinstance(config[key], int):
+                config[key] = int(env_val)
             else:
-                config[config_key] = val
-
+                config[key] = env_val
     return config
