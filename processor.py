@@ -1,60 +1,30 @@
 import time
 import logging
-import functools
-import urllib.error
-import urllib.request
-import json
-from typing import Callable, Any, Optional
+from typing import Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
 
-def retry_network_op(
-    max_retries: int = 3,
-    backoff_factor: float = 1.5,
-    exceptions: tuple = (urllib.error.URLError, TimeoutError, ConnectionError)
-):
-    """
-    Decorator for retrying network operations with exponential backoff.
-    Designed for crypto API endpoints prone to transient connection errors.
-    """
-    def decorator(func: Callable) -> Callable:
-        @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            retries = 0
-            delay = 1.0
+def format_crypto_amount(amount: float, precision: int = 8) -> str:
+    """Format raw floats into standardized crypto string notation."""
+    return f"{amount:.{precision}f}".rstrip('0').rstrip('.')
 
-            while True:
-                try:
-                    return func(*args, **kwargs)
-                except exceptions as err:
-                    retries += 1
-                    if retries > max_retries:
-                        logger.error(f"Failed '{func.__name__}' after {max_retries} retries: {err}")
-                        raise
-                    
-                    sleep_time = delay * (backoff_factor ** (retries - 1))
-                    logger.warning(
-                        f"Network error in '{func.__name__}': {err}. Retrying in {sleep_time:.2f}s ({retries}/{max_retries})"
-                    )
-                    time.sleep(sleep_time)
+def validate_order_params(params: Dict[str, Any]) -> bool:
+    """Ensure required fields exist in order payload."""
+    required = ['symbol', 'side', 'type', 'quantity']
+    return all(key in params for key in required)
 
-        return wrapper
-    return decorator
+def retry_operation(func, retries: int = 3, delay: float = 1.0):
+    """Execution wrapper for transient network failures."""
+    last_exception = None
+    for attempt in range(retries):
+        try:
+            return func()
+        except Exception as e:
+            last_exception = e
+            logger.warning(f"Attempt {attempt + 1} failed: {e}")
+            time.sleep(delay * (2 ** attempt))
+    raise last_exception
 
-
-def fetch_crypto_price(symbol: str = "BTCUSDT") -> Optional[dict]:
-    """
-    Fetch current ticker price from public crypto API with retries.
-    """
-    @retry_network_op(max_retries=3, backoff_factor=2.0)
-    def _api_request() -> dict:
-        url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}"
-        req = urllib.request.Request(url, headers={"User-Agent": "automation-tool-45/1.0"})
-        with urllib.request.urlopen(req, timeout=5) as response:
-            return json.loads(response.read().decode("utf-8"))
-
-    try:
-        return _api_request()
-    except Exception as err:
-        logger.error(f"Could not fetch price for {symbol}: {err}")
-        return None
+def calculate_position_size(balance: float, risk_pct: float, price: float) -> float:
+    """Size calculation based on risk tolerance."""
+    return (balance * risk_pct) / price
