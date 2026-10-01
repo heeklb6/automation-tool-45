@@ -1,38 +1,33 @@
-import os
 import json
-from typing import Any, Dict
+import os
+from typing import Dict, Any
 
 DEFAULT_CONFIG = {
-    "rpc_url": "https://mainnet.infura.io/v3/",
-    "max_retries": 3,
-    "timeout": 30,
-    "dry_run": True
+    "rpc_url": "https://bsc-dataseed.binance.org/",
+    "gas_limit": 200000,
+    "retry_attempts": 3,
+    "log_level": "INFO"
 }
 
-def load_config(config_path: str = "config.json") -> Dict[str, Any]:
-    """Loads configuration from disk or returns defaults."""
+def load_config(path: str = "config.json") -> Dict[str, Any]:
+    """Load configuration from JSON file with hardcoded defaults."""
     config = DEFAULT_CONFIG.copy()
     
-    if os.path.exists(config_path):
+    if os.path.exists(path):
         try:
-            with open(config_path, "r") as f:
+            with open(path, "r") as f:
                 user_config = json.load(f)
                 config.update(user_config)
         except (json.JSONDecodeError, IOError) as e:
-            print(f"Warning: Could not read config file: {e}. Using defaults.")
-            
+            print(f"Config load error, using defaults: {e}")
+    
     return config
 
-def get_env_overrides(config: Dict[str, Any]) -> Dict[str, Any]:
-    """Overrides config values with environment variables."""
-    for key in config:
-        env_val = os.getenv(f"AUTO_{key.upper()}")
-        if env_val is not None:
-            # Handle type casting for environment variables
-            if isinstance(config[key], bool):
-                config[key] = env_val.lower() in ("true", "1", "yes")
-            elif isinstance(config[key], int):
-                config[key] = int(env_val)
-            else:
-                config[key] = env_val
-    return config
+def get_rpc_url() -> str:
+    """Access the configured rpc endpoint."""
+    return load_config().get("rpc_url", DEFAULT_CONFIG["rpc_url"])
+
+if __name__ == "__main__":
+    # Demo of configuration loading logic
+    current_cfg = load_config()
+    print(f"Loaded settings: {current_cfg}")
