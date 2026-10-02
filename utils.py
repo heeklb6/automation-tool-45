@@ -1,34 +1,26 @@
-import time
-import functools
-import logging
+import re
+from decimal import Decimal, ROUND_DOWN
 
-# crypto network operations retry decorator
-def retry_network_op(retries=3, delay=2, backoff=2):
-    """Retry a function with exponential backoff."""
-    def decorator(func):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            current_delay = delay
-            for attempt in range(retries):
-                try:
-                    return func(*args, **kwargs)
-                except (ConnectionError, TimeoutError) as e:
-                    if attempt == retries - 1:
-                        logging.error(f"Final attempt {attempt + 1} failed: {e}")
-                        raise
-                    
-                    logging.warning(f"Attempt {attempt + 1} failed, retrying in {current_delay}s...")
-                    time.sleep(current_delay)
-                    current_delay *= backoff
-        return wrapper
-    return decorator
+def to_fixed_precision(amount: float, decimals: int) -> str:
+    """Converts float amount to a string with exact decimal precision, avoiding scientific notation."""
+    dec = Decimal(str(amount))
+    precision_str = '1.' + '0' * decimals if decimals > 0 else '1'
+    quantized = dec.quantize(Decimal(precision_str), rounding=ROUND_DOWN)
+    return str(quantized)
 
-# common status codes for exchange api calls
-EXCHANGE_RATE_LIMIT = 429
-EXCHANGE_MAINTENANCE = 503
+def calculate_slippage_price(base_price: float, slippage_pct: float, is_buy: bool = True) -> float:
+    """Calculates the limit price considering a specific slippage percentage."""
+    factor = 1 + (slippage_pct / 100.0) if is_buy else 1 - (slippage_pct / 100.0)
+    return round(base_price * factor, 8)
 
-@retry_network_op(retries=5, delay=1)
-def fetch_price_data(ticker: str):
-    """Example usage for external crypto price fetch."""
-    # implementation logic for network call
-    return True
+def is_valid_evm_address(address: str) -> bool:
+    """Validates if the provided string is a hex-encoded EVM address."""
+    if not isinstance(address, str):
+        return False
+    return bool(re.match(r"^0x[a-fA-F0-9]{40}$", address))
+
+def convert_to_wei(amount: float, decimals: int = 18) -> int:
+    """Converts a token amount to its smallest integer unit (Wei equivalent)."""
+    dec_amount = Decimal(str(amount))
+    multiplier = Decimal(10 ** decimals)
+    return int(dec_amount * multiplier)
