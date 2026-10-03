@@ -1,52 +1,30 @@
-import logging
-import re
-from typing import Any, Dict, List
+import time
+import hashlib
+import hmac
+from typing import Dict, Any
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+def generate_signature(api_secret: str, payload: str) -> str:
+    """Generates HMAC-SHA256 signature for API authentication."""
+    return hmac.new(
+        api_secret.encode('utf-8'),
+        payload.encode('utf-8'),
+        hashlib.sha256
+    ).hexdigest()
 
-ETH_ADDRESS_PATTERN = re.compile(r"^0x[a-fA-F0-9]{40}$")
-SUPPORTED_SYMBOLS = {"BTC", "ETH", "USDT", "USDC", "SOL"}
+def format_price(amount: float, precision: int = 8) -> str:
+    """Formats crypto price to fixed point string."""
+    return f"{amount:.{precision}f}"
 
+def retry_on_failure(func, retries: int = 3, delay: float = 1.0):
+    """Retry logic wrapper for network-dependent functions."""
+    for i in range(retries):
+        try:
+            return func()
+        except Exception as e:
+            if i == retries - 1:
+                raise e
+            time.sleep(delay * (2 ** i))
 
-def validate_transaction_input(payload: Dict[str, Any]) -> bool:
-    """Validate incoming crypto transaction payload before execution."""
-    if not isinstance(payload, dict):
-        logging.warning("Invalid payload format: expected dict")
-        return False
-
-    address = payload.get("recipient")
-    amount = payload.get("amount")
-    symbol = payload.get("symbol")
-
-    if not address or not isinstance(address, str) or not ETH_ADDRESS_PATTERN.match(address):
-        logging.warning(f"Invalid recipient address: {address}")
-        return False
-
-    if not isinstance(amount, (int, float)) or amount <= 0:
-        logging.warning(f"Invalid transaction amount: {amount}")
-        return False
-
-    if not symbol or not isinstance(symbol, str) or symbol.upper() not in SUPPORTED_SYMBOLS:
-        logging.warning(f"Unsupported crypto symbol: {symbol}")
-        return False
-
-    return True
-
-
-def process_transaction_queue(queue: List[Dict[str, Any]]) -> Dict[str, int]:
-    """Process batch of transactions with input validation in main loop."""
-    stats = {"processed": 0, "skipped": 0}
-
-    for idx, item in enumerate(queue):
-        logging.info(f"Processing item #{idx + 1}")
-        
-        if not validate_transaction_input(item):
-            logging.error(f"Skipping invalid item #{idx + 1}")
-            stats["skipped"] += 1
-            continue
-
-        symbol = item["symbol"].upper()
-        logging.info(f"Successfully dispatched {item['amount']} {symbol} to {item['recipient']}")
-        stats["processed"] += 1
-
-    return stats
+def sanitize_order_data(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Removes null values from API order payloads."""
+    return {k: v for k, v in data.items() if v is not None}
